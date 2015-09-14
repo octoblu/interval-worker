@@ -16,7 +16,7 @@ app.use bodyParser.urlencoded limit: '1mb', extended : true
 app.use bodyParser.json limit : '1mb'
 
 app.post '/:flowId/:nodeId/subscribe', messagesController.subscribe
-app.delete '/:flowId/:nodeId/unsubscribe', messagesController.unsubscribe
+app.delete '/:flowId/unsubscribe', messagesController.unsubscribe
 
 server = app.listen PORT, ->
   host = server.address().address

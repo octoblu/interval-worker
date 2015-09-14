@@ -7,7 +7,7 @@ class MessagesController
     res.status(201).end()
 
   unsubscribe: (req, res) =>
-    @intervalService.unsubscribe req.params.flowId, req.params.nodeId
+    @intervalService.unsubscribeFlow req.params.flowId
     res.status(201).end()
 
 module.exports = MessagesController

@@ -1,4 +1,3 @@
-
 _ = require 'lodash'
 debug = require('debug')('interval-service')
 
@@ -48,7 +47,7 @@ class IntervalService
       delete @intervals[intervalTime]
 
   unsubscribeFlow: (flowId) =>
-    _.each @subscriptionsByUuid[flowId], (key, nodeId)=>
+    _.each @subscriptionsByUuid[flowId], (key, nodeId) =>
       @unsubscribeNode flowId, nodeId
 
 module.exports = IntervalService

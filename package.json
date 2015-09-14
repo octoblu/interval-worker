@@ -1,0 +1,40 @@
+{
+  "name": "nanocyte-interval-service",
+  "version": "1.0.0",
+  "description": "Simple interval service for nanocytes",
+  "main": "server.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octoblu/interval-service.git"
+  },
+  "keywords": [
+    "nanocyte",
+    "octoblu"
+  ],
+  "author": "Octoblu <npm@octoblu.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/octoblu/interval-service/issues"
+  },
+  "homepage": "https://github.com/octoblu/interval-service#readme",
+  "dependencies": {
+    "body-parser": "^1.13.3",
+    "coffee-script": "^1.10.0",
+    "debug": "^2.2.0",
+    "errorhandler": "^1.4.2",
+    "express": "^4.13.3",
+    "express-meshblu-healthcheck": "^1.0.1",
+    "lodash": "^3.10.1",
+    "morgan": "^1.6.1"
+  },
+  "devDependencies": {
+    "chai": "^3.2.0",
+    "coffee-script": "^1.10.0",
+    "mocha": "^2.3.2",
+    "sinon": "^1.16.1",
+    "sinon-chai": "^2.8.0"
+  }
+}

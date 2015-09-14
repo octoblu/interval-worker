@@ -1,2 +1,2 @@
-# interval-service
-Service for interval subscriptions to nanocyte
+# nanocyte-engine-simple
+Simpleton engine for running nanocytes

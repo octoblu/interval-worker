@@ -11,23 +11,20 @@ class IntervalService
   subscribeNode: (flowId, nodeId, intervalTime) =>
     debug 'subscribing with flowId', flowId, 'nodeId', nodeId, 'intervalTime', intervalTime
 
-    if @subscriptionsByUuid[flowId]?[nodeId]
+    if @subscriptionsByUuid[flowId]?[nodeId]?
       @unsubscribeNode flowId, nodeId
 
     @subscriptionsByUuid[flowId] ?= {}
     @subscriptionsByUuid[flowId][nodeId] = intervalTime
 
     @subscriptionsByTime[intervalTime] ?= {}
-    @subscriptionsByTime[intervalTime][flowId] ?= {}
-    @subscriptionsByTime[intervalTime][flowId][nodeId] = true
+    @subscriptionsByTime[intervalTime][nodeId] = true
 
     if !@intervals[intervalTime]
       @intervals[intervalTime] = setInterval =>
-        debug 'firing interval', intervalTime
-        _.each @subscriptionsByTime[intervalTime], (nodes, flowId) =>
-          _.each nodes, (val, nodeId) =>
-            debug ' - in interval', intervalTime, 'for', flowId, '/', nodeId
-            @messenger.message nodeId, timestamp: Date.now() if @messenger
+        nodeIds = _.keys @subscriptionsByTime[intervalTime]
+        debug 'firing interval', intervalTime, 'for', flowId, '/', nodeIds
+        @messenger.message nodeIds, timestamp: Date.now() if @messenger
       , intervalTime
 
   unsubscribeNode: (flowId, nodeId) =>
@@ -39,17 +36,14 @@ class IntervalService
     if _.size(@subscriptionsByUuid[flowId]) == 0
       delete @subscriptionsByUuid[flowId]
 
-    delete @subscriptionsByTime[intervalTime][flowId][nodeId]
-    if _.size(@subscriptionsByTime[intervalTime][flowId]) == 0
-      delete @subscriptionsByTime[intervalTime][flowId]
-
+    delete @subscriptionsByTime[intervalTime][nodeId]
     if _.size(@subscriptionsByTime[intervalTime]) == 0
       debug 'clearing the interval', intervalTime
       clearInterval @intervals[intervalTime]
       delete @intervals[intervalTime]
 
   unsubscribeFlow: (flowId) =>
-    _.each @subscriptionsByUuid[flowId], (key, nodeId) =>
+    _.each _.keys(@subscriptionsByUuid[flowId]), (nodeId) =>
       @unsubscribeNode flowId, nodeId
 
 module.exports = IntervalService

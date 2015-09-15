@@ -7,8 +7,8 @@ class MeshbluMessage
     debug 'loading meshbluMessage with', config
     @meshbluHttp = new MeshbluHttp(config)
 
-  message: (uuid, data) =>
-    payload = _.merge {}, data, devices: [uuid]
+  message: (uuids, data) =>
+    payload = _.merge {}, data, devices: uuids
     debug 'sending payload:', payload
     @meshbluHttp.message payload, =>
       debug 'payload sent:', payload

@@ -3,7 +3,7 @@ express = require 'express'
 errorHandler = require 'errorhandler'
 meshbluHealthcheck = require 'express-meshblu-healthcheck'
 meshbluMessage = new (require './src/models/meshblu-message') require './meshblu.json'
-intervalService = new (require './src/services/interval-service-coalesce') {messenger:meshbluMessage}
+intervalService = new (require './src/services/interval-service-single') {messenger:meshbluMessage}
 messagesController = new (require './src/controllers/messages-controller') {intervalService:intervalService}
 
 PORT  = process.env.PORT ? 80

@@ -1,7 +1,7 @@
 _ = require 'lodash'
 debug = require('debug')('interval-service')
 
-class IntervalService
+class IntervalServiceCoalesce
   constructor: (options={}) ->
     {@messenger} = options
     @subscriptionsByUuid = {}
@@ -46,4 +46,4 @@ class IntervalService
     _.each _.keys(@subscriptionsByUuid[flowId]), (nodeId) =>
       @unsubscribeNode flowId, nodeId
 
-module.exports = IntervalService
+module.exports = IntervalServiceCoalesce

@@ -3,11 +3,12 @@ debug = require('debug')('interval-service')
 
 class IntervalService
   constructor: (options={}) ->
+    {@messenger} = options
     @subscriptionsByUuid = {}
     @subscriptionsByTime = {}
     @intervals = {}
 
-  subscribe: (flowId, nodeId, intervalTime) =>
+  subscribeNode: (flowId, nodeId, intervalTime) =>
     debug 'subscribing with flowId', flowId, 'nodeId', nodeId, 'intervalTime', intervalTime
 
     if @subscriptionsByUuid[flowId]?[nodeId]
@@ -26,6 +27,7 @@ class IntervalService
         _.each @subscriptionsByTime[intervalTime], (nodes, flowId) =>
           _.each nodes, (val, nodeId) =>
             debug ' - in interval', intervalTime, 'for', flowId, '/', nodeId
+            @messenger.message nodeId, timestamp: Date.now() if @messenger
       , intervalTime
 
   unsubscribeNode: (flowId, nodeId) =>

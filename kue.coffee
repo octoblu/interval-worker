@@ -8,9 +8,11 @@ meshbluMessage = new (require './src/models/meshblu-message') require './meshblu
 redis = new (require 'ioredis');
 debug = require('debug')('interval-service')
 
-queue = kue.createQueue();
+queue = kue.createQueue
+  promotion:
+    interval: process.env.INTERVAL_PROMOTION ? 100
 
-queue.process 'interval', process.env.INTERVAL_JOBS ? 100, (job, done) =>
+queue.process 'interval', process.env.INTERVAL_JOBS ? 1000, (job, done) =>
   debug 'processing interval job', job.id, 'data', job.data
 
   redis.srem "interval/job/#{job.data.targetId}", job.id

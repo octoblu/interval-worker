@@ -7,10 +7,11 @@ class MeshbluMessage
     debug 'loading meshbluMessage with', config
     @meshbluHttp = new MeshbluHttp(config)
 
-  message: (uuids, data) =>
+  message: (uuids, data, callback = =>) =>
     payload = _.merge {}, data, devices: uuids
     debug 'sending payload:', payload
-    @meshbluHttp.message payload, =>
-      debug 'payload sent:', payload
+    @meshbluHttp.message payload, (err, res) =>
+      debug 'payload sent:', payload, 'error', err, 'result', res
+      callback err, res
 
 module.exports = MeshbluMessage

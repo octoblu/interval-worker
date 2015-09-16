@@ -7,6 +7,7 @@ meshbluHealthcheck = require 'express-meshblu-healthcheck'
 meshbluMessage = new (require './src/models/meshblu-message') require './meshblu.json'
 redis = new (require 'ioredis');
 debug = require('debug')('interval-service')
+cronParser = require 'cron-parser'
 
 queue = kue.createQueue
   promotion:
@@ -29,16 +30,31 @@ queue.process 'interval', process.env.INTERVAL_JOBS ? 1000, (job, done) =>
     redis.mget [
       "interval/active/#{job.data.groupId}",
       "interval/active/#{job.data.targetId}",
-      "interval/time/#{job.data.targetId}" ],
+      "interval/time/#{job.data.targetId}",
+      "interval/cron/#{job.data.targetId}" ],
 
       (err, jobInfo) =>
-        [ activeGroup, activeTarget, intervalTime ] = jobInfo
-        debug 'job information', err, jobInfo, activeGroup, activeTarget, intervalTime
+        [ activeGroup, activeTarget, intervalTime, cronString ] = jobInfo
+        debug 'job info', err, jobInfo, job.id
         return done() if !(activeGroup and activeTarget)
         debug 'creating a new job!'
         meshbluMessage.message [job.data.targetId], timestamp: Date.now()
         # , (err, res) =>
         #   return done(err) if err
+
+        if (cronString)
+          cron = cronParser.parseExpression cronString,
+            currentDate: new Date(Date.now() + 1000)
+          nextTime = cron.next()
+          # while (nextTime.getTime() - Date.now()) <= 0
+          #   nextTime = cron.next()
+
+          intervalTime = nextTime.getTime() - Date.now()
+          debug 'cron parser results:', intervalTime/1000, 's on date', nextTime.toString()
+          redis.set "interval/time/#{job.data.targetId}", intervalTime
+
+        debug 'creating a job to run in', intervalTime
+
         job =
           queue.create('interval', job.data).
           delay(intervalTime).

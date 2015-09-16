@@ -11,7 +11,7 @@ class MeshbluMessage
     payload = _.merge {}, data, devices: uuids
     debug 'sending payload:', payload
     @meshbluHttp.message payload, (err, res) =>
-      debug 'payload sent:', payload, 'error', err, 'result', res
+      # debug 'payload sent:', payload, 'error', err, 'result', res
       callback err, res
 
 module.exports = MeshbluMessage

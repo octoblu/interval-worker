@@ -12,20 +12,38 @@ queue = kue.createQueue();
 
 queue.process 'interval', process.env.INTERVAL_JOBS ? 100, (job, done) =>
   debug 'processing interval job', job.id, 'data', job.data
-  redis.mget [ "active/#{job.data.groupId}", "active/#{job.data.targetId}" ],
-    (err, active) =>
-      debug 'active', err, active
-      return done() if ! _.eq active, ['true','true']
-      debug 'creating a new job!'
-      meshbluMessage.message [job.data.targetId], timestamp: Date.now(), (err, res) =>
-        return done(err) if err
+
+  redis.srem "interval/job/#{job.data.targetId}", job.id
+  redis.smembers "interval/job/#{job.data.targetId}", (err, jobIds) =>
+
+    _.each jobIds, (jobId) =>
+      debug 'checking jobId', jobId, 'to', job.id
+      return if jobId == job.id
+      debug 'removing stale jobId', jobId
+      kue.Job.get jobId, (err, job) =>
+        return if err
+        job.remove()
+
+    redis.mget [
+      "interval/active/#{job.data.groupId}",
+      "interval/active/#{job.data.targetId}",
+      "interval/time/#{job.data.targetId}" ],
+
+      (err, jobInfo) =>
+        [ activeGroup, activeTarget, intervalTime ] = jobInfo
+        debug 'job information', err, jobInfo, activeGroup, activeTarget, intervalTime
+        return done() if !(activeGroup and activeTarget)
+        debug 'creating a new job!'
+        meshbluMessage.message [job.data.targetId], timestamp: Date.now()
+        # , (err, res) =>
+        #   return done(err) if err
         job =
           queue.create('interval', job.data).
-          delay(job.data.intervalTime).
+          delay(intervalTime).
           removeOnComplete(true).
           attempts(process.env.INTERVAL_ATTEMPTS ? 999).
           ttl(process.env.INTERVAL_TTL ? 10000).
-          save =>
+          save (err) =>
             debug 'created a job', job.id
-            redis.set "job/#{job.data.targetId}", job.id
-            done()
+            redis.sadd "interval/job/#{job.data.targetId}", job.id
+            done(err)

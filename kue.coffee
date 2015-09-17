@@ -43,12 +43,10 @@ queue.process 'interval', process.env.INTERVAL_JOBS ? 1000, (job, done) =>
         #   return done(err) if err
 
         if (cronString)
-          cron = cronParser.parseExpression cronString,
-            currentDate: new Date(Date.now() + 1000)
-          nextTime = cron.next()
-          # while (nextTime.getTime() - Date.now()) <= 0
-          #   nextTime = cron.next()
-
+          now = new Date()
+          now.setSeconds(now.getSeconds() + 1)
+          now.setMilliseconds(0)
+          nextTime = (cronParser.parseExpression cronString, currentDate: now).next()
           intervalTime = nextTime.getTime() - Date.now()
           debug 'cron parser results:', intervalTime/1000, 's on date', nextTime.toString()
           redis.set "interval/time/#{job.data.targetId}", intervalTime

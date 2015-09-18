@@ -1,0 +1,79 @@
+_          = require 'lodash'
+async       = require 'async'
+cronParser = require 'cron-parser'
+debug      = require('debug')('interval-service')
+
+class KueWorker
+  constructor: (dependencies={})->
+    @INTERVAL_PROMOTION = process.env.INTERVAL_PROMOTION ? 100
+    @INTERVAL_JOBS      = process.env.INTERVAL_JOBS ? 1000
+
+    @kue = dependencies.kue ? require 'kue'
+    IORedis = dependencies.IORedis ? require 'ioredis'
+    MeshbluMessage = dependencies.MeshbluMessage ? require './meshblu-message'
+    @redis = new IORedis
+    @meshbluMessage = new MeshbluMessage
+    @queue = @kue.createQueue promotion: interval: @INTERVAL_PROMOTION
+
+  start: =>
+    @queue.process 'interval', @INTERVAL_JOBS, @processJob
+
+  processJob: (job, done=->) =>
+    debug 'processing interval job', job.id, 'data', job.data
+    jobStartTime = new Date()
+
+    @getTargetJobs job, (error, jobIds) =>
+      return done error if error?
+      @removeJobs jobIds
+
+      @getJobInfo job, (error, jobInfo) =>
+        [ activeGroup, activeTarget, intervalTime, cronString ] = jobInfo?
+        debug 'job info', error, jobInfo, job.id
+        return done() if !activeGroup or !activeTarget
+        debug 'creating a new job!'
+        @meshbluMessage.message [job.data.targetId], timestamp: Date.now()
+        intervalTime = @calculateNextCronInterval jobStartTime, cronString if cronString?
+        @setCronInterval intervalTime, cronString
+        done()
+
+  getTargetJobs: (job, callback=->) =>
+    @redis.srem "interval/job/#{job.data.targetId}", job.id
+    @redis.smembers "interval/job/#{job.data.targetId}", (error, allJobIds) =>
+      return callback error if error
+      callback null, _.without allJobIds, job.id
+
+  removeJob: (jobId, callback=->) =>
+    debug 'removing stale jobId', jobId
+    @kue.Job.get jobId, (err, job) =>
+      return callback error if err
+      job.remove()
+      callback null
+
+  removeJobs: (jobIds, callback=->)=>
+    async.each jobIds, @removeJob, callback
+
+  getJobInfo: (job, callback=->) =>
+    keys = [
+      "interval/active/#{job.data.groupId}",
+      "interval/active/#{job.data.targetId}",
+      "interval/time/#{job.data.targetId}",
+      "interval/cron/#{job.data.targetId}"
+    ]
+    @redis.mget keys, callback
+
+  calculateNextCronInterval: (date, cronString) =>
+    date.setSeconds(date.getSeconds() + 1)
+    date.setMilliseconds(0)
+    try
+      nextTime = cronParser.parseExpression(cronString, currentDate: date).next()
+      debug 'cron parser results:', intervalTime/1000, 's on date', nextTime.toString()
+      return nextTime.getTime() - Date.now()
+    catch error
+      debug 'error parsing cronString', cronString, error
+      return 1000
+
+  setCronInterval: (intervalTime, cronString) =>
+    return unless cronString?
+    @redis.set "interval/time/#{job.data.targetId}", intervalTime
+
+module.exports = KueWorker

@@ -1,31 +1,4 @@
-_ = require 'lodash'
-kue = require 'kue'
-morgan = require 'morgan'
-express = require 'express'
-errorHandler = require 'errorhandler'
-meshbluHealthcheck = require 'express-meshblu-healthcheck'
-meshbluMessage = new (require './src/models/meshblu-message') require './meshblu.json'
-redis = new (require 'ioredis');
-debug = require('debug')('interval-service')
-cronParser = require 'cron-parser'
 
-queue = kue.createQueue
-  promotion:
-    interval: process.env.INTERVAL_PROMOTION ? 100
-
-queue.process 'interval', process.env.INTERVAL_JOBS ? 1000, (job, done) =>
-  debug 'processing interval job', job.id, 'data', job.data
-
-  redis.srem "interval/job/#{job.data.targetId}", job.id
-  redis.smembers "interval/job/#{job.data.targetId}", (err, jobIds) =>
-
-    _.each jobIds, (jobId) =>
-      debug 'checking jobId', jobId, 'to', job.id
-      return if jobId == job.id
-      debug 'removing stale jobId', jobId
-      kue.Job.get jobId, (err, job) =>
-        return if err
-        job.remove()
 
     redis.mget [
       "interval/active/#{job.data.groupId}",

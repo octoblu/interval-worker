@@ -1,12 +1,14 @@
 _          = require 'lodash'
-async       = require 'async'
-cronParser = require 'cron-parser'
+async      = require 'async'
 debug      = require('debug')('interval-service')
+cronParser = require 'cron-parser'
 
 class KueWorker
   constructor: (dependencies={})->
-    @INTERVAL_PROMOTION = process.env.INTERVAL_PROMOTION ? 100
+    @INTERVAL_TTL       = process.env.INTERVAL_TTL ? 10000
     @INTERVAL_JOBS      = process.env.INTERVAL_JOBS ? 1000
+    @INTERVAL_ATTEMPTS  = process.env.INTERVAL_ATTEMPTS ? 999
+    @INTERVAL_PROMOTION = process.env.INTERVAL_PROMOTION ? 100
 
     @kue = dependencies.kue ? require 'kue'
     IORedis = dependencies.IORedis ? require 'ioredis'
@@ -33,14 +35,19 @@ class KueWorker
         debug 'creating a new job!'
         @meshbluMessage.message [job.data.targetId], timestamp: Date.now()
 
-        try
-          intervalTime = @calculateNextCronInterval cronString, jobStartTime if cronString?
-        catch error
-          console.error error
-          done()
+        if cronString?
+          try
+            intervalTime = @calculateNextCronInterval cronString, jobStartTime
+            @redis.set "interval/time/#{job.data.targetId}", intervalTime
+          catch error
+            console.error error
+            done()
 
-        @setCronInterval intervalTime, cronString
-        done()
+        @createJob(job, intervalTime).
+          save (err) =>
+            debug 'created a job', job.id
+            redis.sadd "interval/job/#{job.data.targetId}", job.id
+            done(err)
 
   getTargetJobs: (job, callback=->) =>
     @redis.srem "interval/job/#{job.data.targetId}", job.id
@@ -73,15 +80,18 @@ class KueWorker
     parser = cronParser.parseExpression cronString, currentDate: currentDate
 
     while timeDiff <= 0
-      nextTime = parser.next()
-      nextTime.setMilliseconds 0
-      timeDiff = nextTime - currentDate
-      debug 'this is the next time', timeDiff, nextTime.getTime()
+      nextDate = parser.next()
+      nextDate.setMilliseconds 0
+      timeDiff = nextDate - currentDate
+      debug 'this is the next time', timeDiff, nextDate.getTime()
 
     return timeDiff
 
-  setCronInterval: (intervalTime, cronString) =>
-    return unless intervalTime? and cronString?
-    @redis.set "interval/time/#{job.data.targetId}", intervalTime
+  createJob: (job, intervalTime)=>
+    return queue.create('interval', job.data).
+      delay(intervalTime).
+      removeOnComplete(true).
+      attempts(@INTERVAL_ATTEMPTS).
+      ttl(@INTERVAL_TTL)
 
 module.exports = KueWorker

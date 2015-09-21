@@ -1,4 +1,5 @@
 KueWorker = require '../../src/kue-worker'
+debug = require('debug')('mocha-test')
 
 describe 'KueWorker', ->
   beforeEach ->
@@ -149,6 +150,106 @@ describe 'KueWorker', ->
       it 'should yield jobInfo', ->
         jobInfo = [{id:'activeGroup'}, {id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
         expect(@jobInfo).to.deep.equal jobInfo
+
+  describe '->calculateNextCronInterval', ->
+    fakeDate = new Date(2015, 0, 1, 15, 0, 0, 0)
+    now = new Date
+
+    describe 'when called with seconds option and real date', ->
+      it 'should result in a next time of at most 1000 ms', ->
+        result = @sut.calculateNextCronInterval "* * * * * *", now
+        nextDate = new Date(now.getTime() + result)
+        debug 'result from', now, 'to', nextDate.toString(), result, 'ms'
+        nextSecond = nextDate.getSeconds()- now.getSeconds()
+        if nextSecond == -59
+          nextSecond = 1
+        expect(nextSecond).to.equal 1
+        expect(nextDate.getMilliseconds()).to.equal 0
+        expect(result).to.be.at.most(1000)
+
+    describe 'when called with every 15 seconds option and real date', ->
+      it 'should result in a next time of at most 15000 ms', ->
+        result = @sut.calculateNextCronInterval "*/15 * * * * *", now
+        nextDate = new Date(now.getTime() + result)
+        debug 'result from', now, 'to', nextDate.toString(), result, 'ms'
+        expect(nextDate.getSeconds() % 15).to.equal 0
+        expect(nextDate.getMilliseconds()).to.equal 0
+        expect(result).to.be.at.most(15000)
+
+    describe 'when called with minutes option and real date', ->
+      it 'should result in a next time of at most 60000 ms', ->
+        result = @sut.calculateNextCronInterval "* * * * *", now
+        nextDate = new Date(now.getTime() + result)
+        debug 'result from', now, 'to', nextDate.toString(), result, 'ms'
+        nextMinute = nextDate.getMinutes()- now.getMinutes()
+        if nextMinute == -59
+          nextMinute = 1
+        expect(nextMinute).to.equal 1
+        expect(nextDate.getSeconds()).to.equal 0
+        expect(nextDate.getMilliseconds()).to.equal 0
+        expect(result).to.be.at.most(60000)
+
+    describe 'when called with every 15 minutes option and real date', ->
+      it 'should result in a next time of at most 900000 ms', ->
+        result = @sut.calculateNextCronInterval "*/15 * * * *", now
+        nextDate = new Date(now.getTime() + result)
+        debug 'result from', now, 'to', nextDate.toString(), result, 'ms'
+        expect(nextDate.getMinutes() % 15).to.equal 0
+        expect(nextDate.getSeconds()).to.equal 0
+        expect(nextDate.getMilliseconds()).to.equal 0
+        expect(result).to.be.at.most(900000)
+
+    describe 'when called with seconds option and fake date', ->
+      it 'should result in a next time of 1000 ms', ->
+        result = @sut.calculateNextCronInterval "* * * * * *", fakeDate
+        nextDate = new Date(fakeDate.getTime() + result)
+        debug 'result from', fakeDate, 'to', new Date(fakeDate.getTime() + result).toString(), result, 'ms'
+        nextSecond = nextDate.getSeconds()- fakeDate.getSeconds()
+        if nextSecond == -59
+          nextSecond = 1
+        expect(nextSecond).to.equal 1
+        expect(nextDate.getMilliseconds()).to.equal 0
+        expect(result).to.equals(1000)
+
+    describe 'when called with every 15 seconds option and fake date', ->
+      it 'should result in a next time of 15000 ms', ->
+        result = @sut.calculateNextCronInterval "*/15 * * * * *", fakeDate
+        nextDate = new Date(fakeDate.getTime() + result)
+        debug 'result from', fakeDate, 'to', new Date(fakeDate.getTime() + result).toString(), result, 'ms'
+        expect(nextDate.getSeconds() % 15).to.equal 0
+        expect(nextDate.getMilliseconds()).to.equal 0
+        expect(result).to.equals(15000)
+
+    describe 'when called with minutes option and fake date', ->
+      it 'should result in a next time of 60000 ms', ->
+        result = @sut.calculateNextCronInterval "* * * * *", fakeDate
+        nextDate = new Date(fakeDate.getTime() + result)
+        debug 'result from', fakeDate, 'to', new Date(fakeDate.getTime() + result).toString(), result, 'ms'
+        nextMinute = nextDate.getMinutes()- fakeDate.getMinutes()
+        if nextMinute == -59
+          nextMinute = 1
+        expect(nextMinute).to.equal 1
+        expect(nextDate.getSeconds()).to.equal 0
+        expect(result).to.equals(60000)
+
+    describe 'when called with every 15 minutes option and fake date', ->
+      it 'should result in a next time of 900000 ms', ->
+        result = @sut.calculateNextCronInterval "*/15 * * * *", fakeDate
+        nextDate = new Date(fakeDate.getTime() + result)
+        debug 'result from', fakeDate, 'to', new Date(fakeDate.getTime() + result).toString(), result, 'ms'
+        expect(nextDate.getMinutes() % 15).to.equal 0
+        expect(nextDate.getSeconds()).to.equal 0
+        expect(nextDate.getMilliseconds()).to.equal 0
+        expect(result).to.equals(900000)
+
+    describe 'when called with an invalid cron string', ->
+      it 'should throw an error', ->
+        hasError = false
+        try
+          @sut.calculateNextCronInterval "*/1000E * * * * *", fakeDate
+        catch error
+          hasError = true
+        expect(hasError).to.equals true
 
 class IORedis
   srem: =>

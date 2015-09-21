@@ -32,7 +32,13 @@ class KueWorker
         return done() if !activeGroup or !activeTarget
         debug 'creating a new job!'
         @meshbluMessage.message [job.data.targetId], timestamp: Date.now()
-        intervalTime = @calculateNextCronInterval jobStartTime, cronString if cronString?
+
+        try
+          intervalTime = @calculateNextCronInterval cronString, jobStartTime if cronString?
+        catch error
+          console.error error
+          done()
+
         @setCronInterval intervalTime, cronString
         done()
 
@@ -61,19 +67,21 @@ class KueWorker
     ]
     @redis.mget keys, callback
 
-  calculateNextCronInterval: (date, cronString) =>
-    date.setSeconds(date.getSeconds() + 1)
-    date.setMilliseconds(0)
-    try
-      nextTime = cronParser.parseExpression(cronString, currentDate: date).next()
-      debug 'cron parser results:', intervalTime/1000, 's on date', nextTime.toString()
-      return nextTime.getTime() - Date.now()
-    catch error
-      debug 'error parsing cronString', cronString, error
-      return 1000
+  calculateNextCronInterval: (cronString, currentDate) =>
+    currentDate ?= new Date
+    timeDiff = 0
+    parser = cronParser.parseExpression cronString, currentDate: currentDate
+
+    while timeDiff <= 0
+      nextTime = parser.next()
+      nextTime.setMilliseconds 0
+      timeDiff = nextTime - currentDate
+      debug 'this is the next time', timeDiff, nextTime.getTime()
+
+    return timeDiff
 
   setCronInterval: (intervalTime, cronString) =>
-    return unless cronString?
+    return unless intervalTime? and cronString?
     @redis.set "interval/time/#{job.data.targetId}", intervalTime
 
 module.exports = KueWorker

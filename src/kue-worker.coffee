@@ -43,10 +43,10 @@ class KueWorker
             console.error error
             done()
 
-        @createJob(job, intervalTime).
+        newJob = @createJob(job.data, intervalTime).
           save (err) =>
-            debug 'created a job', job.id
-            redis.sadd "interval/job/#{job.data.targetId}", job.id
+            debug 'created a job', newJob.id
+            redis.sadd "interval/job/#{job.data.targetId}", newJob.id
             done(err)
 
   getTargetJobs: (job, callback=->) =>
@@ -87,8 +87,8 @@ class KueWorker
 
     return timeDiff
 
-  createJob: (job, intervalTime)=>
-    return queue.create('interval', job.data).
+  createJob: (data, intervalTime)=>
+    return queue.create('interval', data).
       delay(intervalTime).
       removeOnComplete(true).
       attempts(@INTERVAL_ATTEMPTS).

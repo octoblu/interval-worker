@@ -14,7 +14,7 @@ class KueWorker
     @kue = dependencies.kue ? require 'kue'
     IORedis = dependencies.IORedis ? require 'ioredis'
     MeshbluMessage = dependencies.MeshbluMessage ? require './meshblu-message'
-    @redis = new IORedis
+    @redis = new IORedis port: process.env.REDIS_PORT, host: process.env.REDIS_HOST
     @meshbluMessage = new MeshbluMessage
     @queue = @kue.createQueue promotion: interval: @INTERVAL_PROMOTION
     debug 'done KueWorker constructor'

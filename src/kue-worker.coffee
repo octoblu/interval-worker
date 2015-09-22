@@ -6,6 +6,7 @@ cronParser = require 'cron-parser'
 class KueWorker
   constructor: (dependencies={})->
     debug 'start KueWorker constructor'
+
     @INTERVAL_TTL       = process.env.INTERVAL_TTL ? 10000
     @INTERVAL_JOBS      = process.env.INTERVAL_JOBS ? 1000
     @INTERVAL_ATTEMPTS  = process.env.INTERVAL_ATTEMPTS ? 999
@@ -13,15 +14,19 @@ class KueWorker
     @REDIS_PORT         = process.env.REDIS_PORT ? 6379
     @REDIS_HOST         = process.env.REDIS_HOST ? 'localhost'
 
-    console.log 'Redis host:', process.env.REDIS_HOST
-    console.log 'Redis port:', process.env.REDIS_PORT
-
     @kue = dependencies.kue ? require 'kue'
     IORedis = dependencies.IORedis ? require 'ioredis'
     MeshbluMessage = dependencies.MeshbluMessage ? require './meshblu-message'
     @redis = new IORedis @REDIS_PORT, @REDIS_HOST
     @meshbluMessage = new MeshbluMessage
-    @queue = @kue.createQueue promotion: interval: @INTERVAL_PROMOTION
+
+    @queue = @kue.createQueue
+      redis:
+        port: @REDIS_PORT
+        host: @REDIS_HOST
+      promotion:
+        interval: @INTERVAL_PROMOTION
+
     debug 'done KueWorker constructor'
 
   start: =>

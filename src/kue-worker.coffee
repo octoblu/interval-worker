@@ -11,6 +11,8 @@ class KueWorker
     @INTERVAL_ATTEMPTS  = process.env.INTERVAL_ATTEMPTS ? 999
     @INTERVAL_PROMOTION = process.env.INTERVAL_PROMOTION ? 100
 
+    console.log 'my environment:', process.env
+
     @kue = dependencies.kue ? require 'kue'
     IORedis = dependencies.IORedis ? require 'ioredis'
     MeshbluMessage = dependencies.MeshbluMessage ? require './meshblu-message'

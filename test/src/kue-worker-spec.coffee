@@ -19,6 +19,10 @@ describe 'KueWorker', ->
         @sut.getTargetJobs = sinon.stub().yields null, ['some-job']
         @sut.removeJobs = sinon.stub()
         @sut.getJobInfo = sinon.stub().yields null, [ true, true, 60000, undefined ]
+        @createJob = {}
+        @createJob.save = sinon.stub().yields null
+        @sut.createJob = => @createJob
+        @sut.redis.sadd = sinon.stub()
         @job = data: {targetId: 'some-job', groupId: 'some-group'}, id: 'some-target-id'
         @sut.processJob @job, (@error) => done()
 
@@ -34,8 +38,11 @@ describe 'KueWorker', ->
       it 'should call getJobInfo', ->
         expect(@sut.getJobInfo).to.have.been.calledWith @job
 
-      it 'should call createJob', ->
-        expect(@sut.createJob).to.have.been.calledWith @job.data, 10
+      it 'should call createJob.save', ->
+        expect(@createJob.save).to.have.been.called
+
+      it 'should call redis.sadd', ->
+        expect(@sut.redis.sadd).to.have.been.calledWith "interval/job/some-job"
 
     describe 'when called with another job', ->
       beforeEach (done) ->
@@ -43,6 +50,10 @@ describe 'KueWorker', ->
         @sut.getTargetJobs = sinon.stub().yields null, ['another-job']
         @sut.removeJobs = sinon.stub()
         @sut.getJobInfo = sinon.stub().yields null, [ true, true, 60000, undefined ]
+        @createJob = {}
+        @createJob.save = sinon.stub().yields null
+        @sut.createJob = => @createJob
+        @sut.redis.sadd = sinon.stub()
         @job = data: {targetId: 'another-job', groupId: 'another-group'}, id: 'another-target-id'
         @sut.processJob @job, (@error) => done()
 
@@ -57,6 +68,12 @@ describe 'KueWorker', ->
 
       it 'should call getJobInfo', ->
         expect(@sut.getJobInfo).to.have.been.calledWith @job
+
+      it 'should call createJob.save', ->
+        expect(@createJob.save).to.have.been.called
+
+      it 'should call redis.sadd', ->
+        expect(@sut.redis.sadd).to.have.been.calledWith "interval/job/another-job"
 
   describe '->getTargetJobs', ->
     describe 'when called with a job', ->
@@ -260,6 +277,7 @@ class IORedis
   srem: =>
   smembers: =>
   mget: =>
+  sadd: =>
 
 class MeshbluMessage
   message: =>

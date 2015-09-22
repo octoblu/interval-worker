@@ -43,11 +43,11 @@ class KueWorker
             console.error error
             done()
 
-        newJob = @createJob(job.data, intervalTime).
-          save (err) =>
-            debug 'created a job', newJob.id
-            redis.sadd "interval/job/#{job.data.targetId}", newJob.id
-            done(err)
+        newJob = @createJob(job.data, intervalTime)
+        newJob.save (err) =>
+          debug 'created a job', newJob.id
+          @redis.sadd "interval/job/#{job.data.targetId}", newJob.id
+          done(err)
 
   getTargetJobs: (job, callback=->) =>
     @redis.srem "interval/job/#{job.data.targetId}", job.id

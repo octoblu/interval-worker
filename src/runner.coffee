@@ -5,5 +5,6 @@ class Runner
 
   start: =>
     @kueWorker = new KueWorker
+    @kueWorker.start()
 
 module.exports = Runner

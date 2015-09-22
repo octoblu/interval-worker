@@ -1,4 +1,4 @@
-Runner = require './src/runner'
+KueWorker = require './src/kue-worker'
 morgan = require 'morgan'
 express = require 'express'
 errorHandler = require 'errorhandler'
@@ -15,6 +15,6 @@ server = app.listen PORT, ->
   host = server.address().address
   port = server.address().port
 
-  new Runner().start()
+  new KueWorker().start()
 
   console.log "Server running on #{host}:#{port}"

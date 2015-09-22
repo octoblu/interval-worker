@@ -19,12 +19,10 @@ describe 'KueWorker', ->
         @sut.getTargetJobs = sinon.stub().yields null, ['some-job']
         @sut.removeJobs = sinon.stub()
         @sut.getJobInfo = sinon.stub().yields null, [ true, true, 60000, undefined ]
-        @createJob = {}
-        @createJob.save = sinon.stub().yields null
-        @sut.createJob = => @createJob
         @sut.redis.sadd = sinon.stub()
+        @sut.createJob = sinon.stub().yields null, id: 'a-new-job-id'
         @job = data: {targetId: 'some-job', groupId: 'some-group'}, id: 'some-target-id'
-        @sut.processJob @job, (@error) => done()
+        @sut.processJob @job, {}, (@error) => done()
 
       it 'should not have an error', ->
         expect(@error).to.not.exist
@@ -38,8 +36,8 @@ describe 'KueWorker', ->
       it 'should call getJobInfo', ->
         expect(@sut.getJobInfo).to.have.been.calledWith @job
 
-      it 'should call createJob.save', ->
-        expect(@createJob.save).to.have.been.called
+      it 'should call createJob', ->
+        expect(@sut.createJob).to.have.been.called
 
       it 'should call redis.sadd', ->
         expect(@sut.redis.sadd).to.have.been.calledWith "interval/job/some-job"
@@ -50,12 +48,10 @@ describe 'KueWorker', ->
         @sut.getTargetJobs = sinon.stub().yields null, ['another-job']
         @sut.removeJobs = sinon.stub()
         @sut.getJobInfo = sinon.stub().yields null, [ true, true, 60000, undefined ]
-        @createJob = {}
-        @createJob.save = sinon.stub().yields null
-        @sut.createJob = => @createJob
+        @sut.createJob = sinon.stub().yields null, id: 'another-new-job-id'
         @sut.redis.sadd = sinon.stub()
         @job = data: {targetId: 'another-job', groupId: 'another-group'}, id: 'another-target-id'
-        @sut.processJob @job, (@error) => done()
+        @sut.processJob @job, {}, (@error) => done()
 
       it 'should not have an error', ->
         expect(@error).to.not.exist
@@ -69,8 +65,8 @@ describe 'KueWorker', ->
       it 'should call getJobInfo', ->
         expect(@sut.getJobInfo).to.have.been.calledWith @job
 
-      it 'should call createJob.save', ->
-        expect(@createJob.save).to.have.been.called
+      it 'should call createJob', ->
+        expect(@sut.createJob).to.have.been.called
 
       it 'should call redis.sadd', ->
         expect(@sut.redis.sadd).to.have.been.calledWith "interval/job/another-job"

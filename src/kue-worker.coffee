@@ -5,6 +5,7 @@ cronParser = require 'cron-parser'
 
 class KueWorker
   constructor: (dependencies={})->
+    debug 'start KueWorker constructor'
     @INTERVAL_TTL       = process.env.INTERVAL_TTL ? 10000
     @INTERVAL_JOBS      = process.env.INTERVAL_JOBS ? 1000
     @INTERVAL_ATTEMPTS  = process.env.INTERVAL_ATTEMPTS ? 999
@@ -16,11 +17,13 @@ class KueWorker
     @redis = new IORedis
     @meshbluMessage = new MeshbluMessage
     @queue = @kue.createQueue promotion: interval: @INTERVAL_PROMOTION
+    debug 'done KueWorker constructor'
 
   start: =>
+    debug 'kueWorker queue start'
     @queue.process 'interval', @INTERVAL_JOBS, @processJob
 
-  processJob: (job, done=->) =>
+  processJob: (job, ctx, done) =>
     debug 'processing interval job', job.id, 'data', job.data
     jobStartTime = new Date()
 
@@ -35,7 +38,8 @@ class KueWorker
         debug 'creating a new job!'
         @meshbluMessage.message [job.data.targetId], timestamp: Date.now()
 
-        if cronString?
+        if cronString
+          debug 'calculating next interval from cronString', cronString
           try
             intervalTime = @calculateNextCronInterval cronString, jobStartTime
             @redis.set "interval/time/#{job.data.targetId}", intervalTime
@@ -43,9 +47,8 @@ class KueWorker
             console.error error
             done()
 
-        newJob = @createJob(job.data, intervalTime)
-        newJob.save (err) =>
-          debug 'created a job', newJob.id
+        @createJob job.data, intervalTime, (err, newJob) =>
+          debug 'created a job', newJob.id, 'with intervalTime', intervalTime
           @redis.sadd "interval/job/#{job.data.targetId}", newJob.id
           done(err)
 
@@ -58,7 +61,7 @@ class KueWorker
   removeJob: (jobId, callback=->) =>
     debug 'removing stale jobId', jobId
     @kue.Job.get jobId, (err, job) =>
-      return callback error if err
+      return callback err if err
       job.remove()
       callback null
 
@@ -87,11 +90,13 @@ class KueWorker
 
     return timeDiff
 
-  createJob: (data, intervalTime)=>
-    return @queue.create('interval', data).
+  createJob: (data, intervalTime, callback)=>
+    job = @queue.create('interval', data).
       delay(intervalTime).
       removeOnComplete(true).
       attempts(@INTERVAL_ATTEMPTS).
-      ttl(@INTERVAL_TTL)
+      ttl(@INTERVAL_TTL).
+      save (error) =>
+        callback error, job
 
 module.exports = KueWorker

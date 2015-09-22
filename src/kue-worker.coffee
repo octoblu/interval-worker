@@ -29,7 +29,7 @@ class KueWorker
       @removeJobs jobIds
 
       @getJobInfo job, (error, jobInfo) =>
-        [ activeGroup, activeTarget, intervalTime, cronString ] = jobInfo?
+        [ activeGroup, activeTarget, intervalTime, cronString ] = jobInfo
         debug 'job info', error, jobInfo, job.id
         return done() if !activeGroup or !activeTarget
         debug 'creating a new job!'
@@ -88,7 +88,7 @@ class KueWorker
     return timeDiff
 
   createJob: (data, intervalTime)=>
-    return queue.create('interval', data).
+    return @queue.create('interval', data).
       delay(intervalTime).
       removeOnComplete(true).
       attempts(@INTERVAL_ATTEMPTS).

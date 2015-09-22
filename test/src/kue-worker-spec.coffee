@@ -15,10 +15,11 @@ describe 'KueWorker', ->
   describe '->processJob', ->
     describe 'when called with a job', ->
       beforeEach (done) ->
+
         @sut.getTargetJobs = sinon.stub().yields null, ['some-job']
         @sut.removeJobs = sinon.stub()
-        @sut.getJobInfo = sinon.stub().yields null
-        @job = data: targetId: 'some-job', groupId: 'some-group'
+        @sut.getJobInfo = sinon.stub().yields null, [ true, true, 60000, undefined ]
+        @job = data: {targetId: 'some-job', groupId: 'some-group'}, id: 'some-target-id'
         @sut.processJob @job, (@error) => done()
 
       it 'should not have an error', ->
@@ -33,12 +34,16 @@ describe 'KueWorker', ->
       it 'should call getJobInfo', ->
         expect(@sut.getJobInfo).to.have.been.calledWith @job
 
+      it 'should call createJob', ->
+        expect(@sut.createJob).to.have.been.calledWith @job.data, 10
+
     describe 'when called with another job', ->
       beforeEach (done) ->
+
         @sut.getTargetJobs = sinon.stub().yields null, ['another-job']
         @sut.removeJobs = sinon.stub()
-        @sut.getJobInfo = sinon.stub().yields null
-        @job = data: targetId: 'another-job', groupId: 'another-group'
+        @sut.getJobInfo = sinon.stub().yields null, [ true, true, 60000, undefined ]
+        @job = data: {targetId: 'another-job', groupId: 'another-group'}, id: 'another-target-id'
         @sut.processJob @job, (@error) => done()
 
       it 'should not have an error', ->

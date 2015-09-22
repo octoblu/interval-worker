@@ -10,13 +10,16 @@ class KueWorker
     @INTERVAL_JOBS      = process.env.INTERVAL_JOBS ? 1000
     @INTERVAL_ATTEMPTS  = process.env.INTERVAL_ATTEMPTS ? 999
     @INTERVAL_PROMOTION = process.env.INTERVAL_PROMOTION ? 100
+    @REDIS_PORT         = process.env.REDIS_PORT ? 6379
+    @REDIS_HOST         = process.env.REDIS_HOST ? 'localhost'
 
-    console.log 'my environment:', process.env
+    console.log 'Redis host:', process.env.REDIS_HOST
+    console.log 'Redis port:', process.env.REDIS_PORT
 
     @kue = dependencies.kue ? require 'kue'
     IORedis = dependencies.IORedis ? require 'ioredis'
     MeshbluMessage = dependencies.MeshbluMessage ? require './meshblu-message'
-    @redis = new IORedis port: process.env.REDIS_PORT, host: process.env.REDIS_HOST
+    @redis = new IORedis port: @REDIS_PORT, host: @REDIS_HOST
     @meshbluMessage = new MeshbluMessage
     @queue = @kue.createQueue promotion: interval: @INTERVAL_PROMOTION
     debug 'done KueWorker constructor'

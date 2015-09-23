@@ -42,9 +42,9 @@ class KueWorker
       @removeJobs jobIds
 
       @getJobInfo job, (error, jobInfo) =>
-        [ activeGroup, activeTarget, intervalTime, cronString ] = jobInfo
+        [ activeTarget, intervalTime, cronString ] = jobInfo
         debug 'job info', error, jobInfo, job.id
-        return done() if !activeGroup or !activeTarget
+        return done() if !activeTarget
         debug 'creating a new job!'
         @meshbluMessage.message [job.data.targetId], timestamp: Date.now()
 
@@ -80,7 +80,6 @@ class KueWorker
 
   getJobInfo: (job, callback=->) =>
     keys = [
-      "interval/active/#{job.data.groupId}",
       "interval/active/#{job.data.targetId}",
       "interval/time/#{job.data.targetId}",
       "interval/cron/#{job.data.targetId}"

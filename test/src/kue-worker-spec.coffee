@@ -18,10 +18,10 @@ describe 'KueWorker', ->
 
         @sut.getTargetJobs = sinon.stub().yields null, ['some-job']
         @sut.removeJobs = sinon.stub()
-        @sut.getJobInfo = sinon.stub().yields null, [ true, true, 60000, undefined ]
+        @sut.getJobInfo = sinon.stub().yields null, [ true, 60000, 0 ]
         @sut.redis.sadd = sinon.stub()
         @sut.createJob = sinon.stub().yields null, id: 'a-new-job-id'
-        @job = data: {targetId: 'some-job', groupId: 'some-group'}, id: 'some-target-id'
+        @job = data: {targetId: 'some-job'}, id: 'some-target-id'
         @sut.processJob @job, {}, (@error) => done()
 
       it 'should not have an error', ->
@@ -47,10 +47,10 @@ describe 'KueWorker', ->
 
         @sut.getTargetJobs = sinon.stub().yields null, ['another-job']
         @sut.removeJobs = sinon.stub()
-        @sut.getJobInfo = sinon.stub().yields null, [ true, true, 60000, undefined ]
+        @sut.getJobInfo = sinon.stub().yields null, [ true, 60000, 0 ]
         @sut.createJob = sinon.stub().yields null, id: 'another-new-job-id'
         @sut.redis.sadd = sinon.stub()
-        @job = data: {targetId: 'another-job', groupId: 'another-group'}, id: 'another-target-id'
+        @job = data: {targetId: 'another-job'}, id: 'another-target-id'
         @sut.processJob @job, {}, (@error) => done()
 
       it 'should not have an error', ->
@@ -125,8 +125,8 @@ describe 'KueWorker', ->
   describe '->getJobInfo', ->
     describe 'when called with a job', ->
       beforeEach (done) ->
-        job = data: targetId: 'some-job', groupId: 'some-group'
-        jobInfo = [{id:'activeGroup'}, {id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
+        job = data: targetId: 'some-job'
+        jobInfo = [{id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
         @sut.redis.mget = sinon.stub().yields null, jobInfo
         @sut.getJobInfo job, (@error, @jobInfo) => done()
 
@@ -135,7 +135,6 @@ describe 'KueWorker', ->
 
       it 'should call redis.mget to be called with keys', ->
         keys = [
-          "interval/active/some-group",
           "interval/active/some-job",
           "interval/time/some-job",
           "interval/cron/some-job"
@@ -143,13 +142,13 @@ describe 'KueWorker', ->
         expect(@sut.redis.mget).to.be.calledWith keys
 
       it 'should yield jobInfo', ->
-        jobInfo = [{id:'activeGroup'}, {id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
+        jobInfo = [{id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
         expect(@jobInfo).to.deep.equal jobInfo
 
     describe 'when called with another job', ->
       beforeEach (done) ->
-        job = data: targetId: 'another-job', groupId: 'another-group'
-        jobInfo = [{id:'activeGroup'}, {id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
+        job = data: targetId: 'another-job'
+        jobInfo = [{id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
         @sut.redis.mget = sinon.stub().yields null, jobInfo
         @sut.getJobInfo job, (@error, @jobInfo) => done()
 
@@ -158,7 +157,6 @@ describe 'KueWorker', ->
 
       it 'should call redis.mget to be called with keys', ->
         keys = [
-          "interval/active/another-group",
           "interval/active/another-job",
           "interval/time/another-job",
           "interval/cron/another-job"
@@ -166,7 +164,7 @@ describe 'KueWorker', ->
         expect(@sut.redis.mget).to.be.calledWith keys
 
       it 'should yield jobInfo', ->
-        jobInfo = [{id:'activeGroup'}, {id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
+        jobInfo = [{id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
         expect(@jobInfo).to.deep.equal jobInfo
 
   describe '->calculateNextCronInterval', ->

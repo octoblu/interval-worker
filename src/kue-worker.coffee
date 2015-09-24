@@ -37,24 +37,24 @@ class KueWorker
     debug 'processing interval job', job.id, 'data', job.data
     jobStartTime = new Date()
 
-    @getTargetJobs job, (error, jobIds) =>
-      return done error if error?
+    @getTargetJobs job, (err, jobIds) =>
+      return done err if err?
       @removeJobs jobIds
 
-      @getJobInfo job, (error, jobInfo) =>
-        [ activeTarget, intervalTime, cronString ] = jobInfo
-        debug 'job info', error, jobInfo, job.id
+      @getJobInfo job, (err, jobInfo) =>
+        [ activeTarget, fromId, intervalTime, cronString ] = jobInfo
+        debug 'job info', err, jobInfo, job.id
         return done() if !activeTarget
         debug 'creating a new job!'
-        @meshbluMessage.message [job.data.targetId], timestamp: Date.now()
+        @meshbluMessage.message [job.data.targetId], payload: from: fromId
 
         if cronString
           debug 'calculating next interval from cronString', cronString
           try
             intervalTime = @calculateNextCronInterval cronString, jobStartTime
             @redis.set "interval/time/#{job.data.targetId}", intervalTime
-          catch error
-            console.error error
+          catch err
+            console.err err
             done()
 
         @createJob job.data, intervalTime, (err, newJob) =>
@@ -64,8 +64,8 @@ class KueWorker
 
   getTargetJobs: (job, callback=->) =>
     @redis.srem "interval/job/#{job.data.targetId}", job.id
-    @redis.smembers "interval/job/#{job.data.targetId}", (error, allJobIds) =>
-      return callback error if error
+    @redis.smembers "interval/job/#{job.data.targetId}", (err, allJobIds) =>
+      return callback err if err
       callback null, _.without allJobIds, job.id
 
   removeJob: (jobId, callback=->) =>
@@ -81,6 +81,7 @@ class KueWorker
   getJobInfo: (job, callback=->) =>
     keys = [
       "interval/active/#{job.data.targetId}",
+      "interval/fromId/#{job.data.targetId}",
       "interval/time/#{job.data.targetId}",
       "interval/cron/#{job.data.targetId}"
     ]
@@ -105,7 +106,7 @@ class KueWorker
       removeOnComplete(true).
       attempts(@INTERVAL_ATTEMPTS).
       ttl(@INTERVAL_TTL).
-      save (error) =>
-        callback error, job
+      save (err) =>
+        callback err, job
 
 module.exports = KueWorker

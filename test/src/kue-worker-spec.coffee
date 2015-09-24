@@ -126,7 +126,7 @@ describe 'KueWorker', ->
     describe 'when called with a job', ->
       beforeEach (done) ->
         job = data: targetId: 'some-job'
-        jobInfo = [{id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
+        jobInfo = [{id:'activeTarget'}, {id: 'fromId'}, {id: 'intervalTime'}, {id: 'cronString'}]
         @sut.redis.mget = sinon.stub().yields null, jobInfo
         @sut.getJobInfo job, (@error, @jobInfo) => done()
 
@@ -136,13 +136,14 @@ describe 'KueWorker', ->
       it 'should call redis.mget to be called with keys', ->
         keys = [
           "interval/active/some-job",
+          "interval/fromId/some-job",
           "interval/time/some-job",
           "interval/cron/some-job"
         ]
         expect(@sut.redis.mget).to.be.calledWith keys
 
       it 'should yield jobInfo', ->
-        jobInfo = [{id:'activeTarget'}, {id: 'intervalTime'}, {id: 'cronString'}]
+        jobInfo = [{id:'activeTarget'}, {id: 'fromId'}, {id: 'intervalTime'}, {id: 'cronString'}]
         expect(@jobInfo).to.deep.equal jobInfo
 
     describe 'when called with another job', ->
@@ -158,6 +159,7 @@ describe 'KueWorker', ->
       it 'should call redis.mget to be called with keys', ->
         keys = [
           "interval/active/another-job",
+          "interval/fromId/another-job",
           "interval/time/another-job",
           "interval/cron/another-job"
         ]

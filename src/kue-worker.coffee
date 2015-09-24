@@ -44,7 +44,12 @@ class KueWorker
       @getJobInfo job, (err, jobInfo) =>
         [ activeTarget, fromId, intervalTime, cronString ] = jobInfo
         debug 'job info', err, jobInfo, job.id
-        return done() if !activeTarget
+        return done err if err?
+
+        if !activeTarget or (_.isNaN(Number intervalTime) and _.isEmpty cronString)
+          debug 'aborting job!'
+          return done()
+
         debug 'creating a new job!'
         @meshbluMessage.message [job.data.targetId], payload: from: fromId
 

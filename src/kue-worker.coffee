@@ -37,39 +37,43 @@ class KueWorker
     debug 'processing interval job', job.id, 'data', job.data
     jobStartTime = new Date()
 
-    @getTargetJobs job, (err, jobIds) =>
+    if (!job?.data?.sendTo?) or (!job?.data?.nodeId?)
+      debug 'missing sendTo or nodeId'
+      return done()
+
+    @getJobs job, (err, jobIds) =>
       return done err if err?
       @removeJobs jobIds
 
       @getJobInfo job, (err, jobInfo) =>
-        [ activeTarget, fromId, intervalTime, cronString ] = jobInfo
+        [ active, intervalTime, cronString ] = jobInfo
         debug 'job info', err, jobInfo, job.id
         return done err if err?
 
-        if !activeTarget or (_.isNaN(Number intervalTime) and _.isEmpty cronString)
+        if !active or (_.isNaN(Number intervalTime) and _.isEmpty cronString)
           debug 'aborting job!'
           return done()
 
         debug 'creating a new job!'
-        @meshbluMessage.message [job.data.targetId], payload: from: fromId
+        @meshbluMessage.message [job.data.sendTo], payload: from: job.data.nodeId
 
         if cronString
           debug 'calculating next interval from cronString', cronString
           try
             intervalTime = @calculateNextCronInterval cronString, jobStartTime
-            @redis.set "interval/time/#{job.data.targetId}", intervalTime
+            @redis.set "interval/time/#{job.data.sendTo}/#{job.data.nodeId}", intervalTime
           catch err
             console.err err
             done()
 
         @createJob job.data, intervalTime, (err, newJob) =>
           debug 'created a job', newJob.id, 'with intervalTime', intervalTime
-          @redis.sadd "interval/job/#{job.data.targetId}", newJob.id
+          @redis.sadd "interval/job/#{job.data.sendTo}/#{job.data.nodeId}", newJob.id
           done(err)
 
-  getTargetJobs: (job, callback=->) =>
-    @redis.srem "interval/job/#{job.data.targetId}", job.id
-    @redis.smembers "interval/job/#{job.data.targetId}", (err, allJobIds) =>
+  getJobs: (job, callback=->) =>
+    @redis.srem "interval/job/#{job.data.sendTo}/#{job.data.nodeId}", job.id
+    @redis.smembers "interval/job/#{job.data.sendTo}/#{job.data.nodeId}", (err, allJobIds) =>
       return callback err if err
       callback null, _.without allJobIds, job.id
 
@@ -85,10 +89,9 @@ class KueWorker
 
   getJobInfo: (job, callback=->) =>
     keys = [
-      "interval/active/#{job.data.targetId}",
-      "interval/fromId/#{job.data.targetId}",
-      "interval/time/#{job.data.targetId}",
-      "interval/cron/#{job.data.targetId}"
+      "interval/active/#{job.data.sendTo}/#{job.data.nodeId}",
+      "interval/time/#{job.data.sendTo}/#{job.data.nodeId}",
+      "interval/cron/#{job.data.sendTo}/#{job.data.nodeId}"
     ]
     @redis.mget keys, callback
 

@@ -58,7 +58,7 @@ class KueWorker
         @meshbluMessage.message [job.data.sendTo],
           payload:
             from: job.data.nodeId
-            timestamp: _.now
+            timestamp: _.now()
 
         if cronString
           debug 'calculating next interval from cronString', cronString

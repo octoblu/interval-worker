@@ -55,7 +55,10 @@ class KueWorker
           return done()
 
         debug 'creating a new job!'
-        @meshbluMessage.message [job.data.sendTo], payload: from: job.data.nodeId
+        @meshbluMessage.message [job.data.sendTo],
+          payload:
+            from: job.data.nodeId
+            timestamp: _.now
 
         if cronString
           debug 'calculating next interval from cronString', cronString

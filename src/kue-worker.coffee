@@ -60,6 +60,8 @@ class KueWorker
             from: job.data.nodeId
             timestamp: _.now()
 
+        return done() if job.data.fireOnce
+
         if cronString
           debug 'calculating next interval from cronString', cronString
           try

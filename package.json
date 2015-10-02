@@ -1,6 +1,6 @@
 {
   "name": "nanocyte-interval-service",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Simple interval service for nanocytes",
   "main": "server.js",
   "scripts": {

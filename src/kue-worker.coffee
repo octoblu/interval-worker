@@ -43,7 +43,7 @@ class KueWorker
 
     @getJobs job, (err, jobIds) =>
       return done err if err?
-      @removeJobs jobIds
+      @removeJobs jobIds unless job.data.noUnsubscribe
 
       @getJobInfo job, (err, jobInfo) =>
         [ active, intervalTime, cronString ] = jobInfo

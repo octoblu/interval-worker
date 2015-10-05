@@ -1,6 +1,6 @@
 _          = require 'lodash'
 async      = require 'async'
-debug      = require('debug')('interval-service')
+debug      = require('debug')('nanocyte-interval-service:kue-worker')
 cronParser = require 'cron-parser'
 
 class KueWorker

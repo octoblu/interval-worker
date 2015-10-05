@@ -34,7 +34,7 @@ class KueWorker
     @queue.process 'interval', @INTERVAL_JOBS, @processJob
 
   processJob: (job, ctx, done) =>
-    debug 'processing interval job', job.id, 'data', job.data
+    debug 'processing interval job', job.id, 'data', JSON.stringify job.data
     jobStartTime = new Date()
 
     if (!job?.data?.sendTo?) or (!job?.data?.nodeId?)
@@ -47,7 +47,7 @@ class KueWorker
 
       @getJobInfo job, (err, jobInfo) =>
         [ active, intervalTime, cronString ] = jobInfo
-        debug 'job info', err, jobInfo, job.id
+        debug 'job info', err, JSON.stringify jobInfo, job.id
         return done err if err?
 
         if !active or (_.isNaN(Number intervalTime) and _.isEmpty cronString)

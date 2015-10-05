@@ -9,11 +9,14 @@ class MeshbluMessage
     debug 'loading meshbluMessage with', JSON.stringify meshbluConfig
     @meshbluHttp = new MeshbluHttp meshbluConfig
 
-  message: (uuids, data, callback = =>) =>
+  stringifyError: (err) ->
+    JSON.stringify err, ["message", "arguments", "type", "name"]
+
+  message: (uuids, data, callback=->) =>
     payload = _.merge {}, data, devices: uuids
     debug 'sending payload:', JSON.stringify payload
     @meshbluHttp.message payload, (err, res) =>
-      # debug 'payload sent:', payload, 'error', err, 'result', res
+      debug 'meshbluHttp error:', @stringifyError err if err
       callback err, res
 
 module.exports = MeshbluMessage

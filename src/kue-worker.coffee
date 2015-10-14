@@ -5,8 +5,6 @@ cronParser = require 'cron-parser'
 
 class KueWorker
   constructor: (dependencies={})->
-    debug 'start KueWorker constructor'
-
     @INTERVAL_TTL       = process.env.INTERVAL_TTL ? 10000
     @INTERVAL_JOBS      = process.env.INTERVAL_JOBS ? 1000
     @INTERVAL_ATTEMPTS  = process.env.INTERVAL_ATTEMPTS ? 999
@@ -27,10 +25,7 @@ class KueWorker
       promotion:
         interval: @INTERVAL_PROMOTION
 
-    debug 'done KueWorker constructor'
-
   start: =>
-    debug 'kueWorker queue start'
     @queue.process 'interval', @INTERVAL_JOBS, @processJob
 
   processJob: (job, ctx, done) =>
@@ -38,7 +33,6 @@ class KueWorker
     jobStartTime = new Date()
 
     if (!job?.data?.sendTo?) or (!job?.data?.nodeId?)
-      debug 'missing sendTo or nodeId'
       return done()
 
     @getJobs job, (err, jobIds) =>
@@ -47,14 +41,11 @@ class KueWorker
 
       @getJobInfo job, (err, jobInfo) =>
         [ active, intervalTime, cronString ] = jobInfo
-        debug 'job info', err, JSON.stringify jobInfo, job.id
         return done err if err?
 
         if !active or (_.isNaN(Number intervalTime) and _.isEmpty cronString)
-          debug 'aborting job!'
           return done()
 
-        debug 'creating a new job!'
         @meshbluMessage.message [job.data.sendTo],
           payload:
             from: job.data.nodeId
@@ -63,7 +54,6 @@ class KueWorker
         return done() if job.data.fireOnce
 
         if cronString
-          debug 'calculating next interval from cronString', cronString
           try
             intervalTime = @calculateNextCronInterval cronString, jobStartTime
             @redis.set "interval/time/#{job.data.sendTo}/#{job.data.nodeId}", intervalTime
@@ -72,7 +62,6 @@ class KueWorker
             done()
 
         @createJob job.data, intervalTime, (err, newJob) =>
-          debug 'created a job', newJob.id, 'with intervalTime', intervalTime
           @redis.sadd "interval/job/#{job.data.sendTo}/#{job.data.nodeId}", newJob.id
           done(err)
 
@@ -83,7 +72,6 @@ class KueWorker
       callback null, _.without allJobIds, job.id
 
   removeJob: (jobId, callback=->) =>
-    debug 'removing stale jobId', jobId
     @kue.Job.get jobId, (err, job) =>
       return callback err if err
       job.remove()
@@ -109,7 +97,6 @@ class KueWorker
       nextDate = parser.next()
       nextDate.setMilliseconds 0
       timeDiff = nextDate - currentDate
-      debug 'this is the next time', timeDiff, nextDate.getTime()
 
     return timeDiff
 

@@ -8,12 +8,10 @@ class MeshbluMessage
     meshbluConfig = new MeshbluConfig({}).toJSON()
     @meshbluHttp = new MeshbluHttp meshbluConfig
 
-  stringifyError: (err) ->
-    JSON.stringify err, ["message", "arguments", "type", "name"]
-
   message: (uuids, data, callback=->) =>
     payload = _.merge {}, data, devices: uuids
-    @meshbluHttp.message payload, (err, res) =>
-      callback err, res
+    @meshbluHttp.message payload, (error, result) =>
+      debug 'meshblu-error:', error if error?
+      callback error, result
 
 module.exports = MeshbluMessage

@@ -5,10 +5,12 @@ cronParser = require 'cron-parser'
 
 class KueWorker
   constructor: (dependencies={})->
+    debug 'start KueWorker constructor'
+
     @INTERVAL_TTL       = process.env.INTERVAL_TTL ? 10000
-    @INTERVAL_JOBS      = process.env.INTERVAL_JOBS ? 1000
+    @INTERVAL_JOBS      = process.env.INTERVAL_JOBS ? 10
     @INTERVAL_ATTEMPTS  = process.env.INTERVAL_ATTEMPTS ? 999
-    @INTERVAL_PROMOTION = process.env.INTERVAL_PROMOTION ? 100
+    @INTERVAL_PROMOTION = process.env.INTERVAL_PROMOTION ? 50
     @REDIS_PORT         = process.env.REDIS_PORT ? 6379
     @REDIS_HOST         = process.env.REDIS_HOST ? 'localhost'
 
@@ -19,13 +21,19 @@ class KueWorker
     @meshbluMessage = new MeshbluMessage
 
     @queue = @kue.createQueue
+      jobEvents: false
       redis:
         port: @REDIS_PORT
         host: @REDIS_HOST
       promotion:
         interval: @INTERVAL_PROMOTION
 
+    @queue.watchStuckJobs()
+
+    debug 'done KueWorker constructor'
+
   start: =>
+    debug 'kueWorker queue start'
     @queue.process 'interval', @INTERVAL_JOBS, @processJob
 
   processJob: (job, ctx, done) =>

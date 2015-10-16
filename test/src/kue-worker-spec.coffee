@@ -4,7 +4,8 @@ debug = require('debug')('mocha-test')
 describe 'KueWorker', ->
   beforeEach ->
     @kue = { Job:{} }
-    @kue.createQueue = sinon.spy()
+    @queue = watchStuckJobs: sinon.spy()
+    @kue.createQueue = sinon.spy => @queue
     @kue.Job.get = sinon.spy()
     dependencies = {}
     dependencies.kue = @kue

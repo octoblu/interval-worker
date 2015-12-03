@@ -13,6 +13,7 @@ class KueWorker
     @INTERVAL_PROMOTION = process.env.INTERVAL_PROMOTION ? 50
     @REDIS_PORT         = process.env.REDIS_PORT ? 6379
     @REDIS_HOST         = process.env.REDIS_HOST ? 'localhost'
+    @MIN_TIME_DIFF      = process.env.MIN_TIME_DIFF ? 200
 
     @kue = dependencies.kue ? require 'kue'
     IORedis = dependencies.IORedis ? require 'ioredis'
@@ -101,7 +102,7 @@ class KueWorker
     timeDiff = 0
     parser = cronParser.parseExpression cronString, currentDate: currentDate
 
-    while timeDiff <= 0
+    while timeDiff <= @MIN_TIME_DIFF
       nextDate = parser.next()
       nextDate.setMilliseconds 0
       timeDiff = nextDate - currentDate

@@ -3,6 +3,7 @@ debug = require('debug')('mocha-test')
 
 describe 'KueWorker', ->
   beforeEach ->
+    process.env.MIN_TIME_DIFF=150
     @kue = { Job:{} }
     @queue = watchStuckJobs: sinon.spy()
     @kue.createQueue = sinon.spy => @queue

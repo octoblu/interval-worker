@@ -7,12 +7,12 @@ class KueWorker
   constructor: (dependencies={})->
     debug 'start KueWorker constructor'
 
-    @INTERVAL_TTL       = Number.parseInt(process.env.INTERVAL_TTL) ? 10000
-    @INTERVAL_JOBS      = Number.parseInt(process.env.INTERVAL_JOBS) ? 10
-    @INTERVAL_ATTEMPTS  = Number.parseInt(process.env.INTERVAL_ATTEMPTS) ? 999
-    @INTERVAL_PROMOTION = Number.parseInt(process.env.INTERVAL_PROMOTION) ? 50
-    @MIN_TIME_DIFF      = Number.parseInt(process.env.MIN_TIME_DIFF) ? 500
-    @REDIS_PORT         = Number.parseInt(process.env.REDIS_PORT) ? 6379
+    @INTERVAL_TTL       = Number.parseInt(process.env.INTERVAL_TTL)       or 10000
+    @INTERVAL_JOBS      = Number.parseInt(process.env.INTERVAL_JOBS)      or 10
+    @INTERVAL_ATTEMPTS  = Number.parseInt(process.env.INTERVAL_ATTEMPTS)  or 999
+    @INTERVAL_PROMOTION = Number.parseInt(process.env.INTERVAL_PROMOTION) or 50
+    @MIN_TIME_DIFF      = Number.parseInt(process.env.MIN_TIME_DIFF)      or 500
+    @REDIS_PORT         = Number.parseInt(process.env.REDIS_PORT)         or 6379
     @REDIS_HOST         = process.env.REDIS_HOST ? 'localhost'
 
     @kue = dependencies.kue ? require 'kue'

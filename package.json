@@ -1,6 +1,6 @@
 {
   "name": "nanocyte-interval-service",
-  "version": "1.0.32",
+  "version": "1.1.0",
   "description": "Simple interval service for nanocytes",
   "main": "interval-service.js",
   "scripts": {
@@ -23,19 +23,14 @@
   "homepage": "https://github.com/octoblu/nanocyte-interval-service#readme",
   "dependencies": {
     "async": "^1.4.2",
-    "body-parser": "^1.13.3",
     "coffee-script": "^1.10.0",
     "cron-parser": "^1.0.0",
     "debug": "^2.2.0",
-    "errorhandler": "^1.4.2",
-    "express": "^4.13.3",
-    "express-meshblu-healthcheck": "^1.0.1",
     "ioredis": "^1.8.0",
     "kue": "^0.9.4",
     "lodash": "^3.10.1",
     "meshblu-config": "^3.1.0",
-    "meshblu-http": "^3.4.1",
-    "morgan": "^1.6.1"
+    "meshblu-http": "^3.4.1"
   },
   "devDependencies": {
     "chai": "^3.2.0",

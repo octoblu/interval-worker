@@ -20,8 +20,5 @@ class Command
     server.run (error) =>
       return @panic error if error?
 
-      {address,port} = server.address()
-      console.log "Server listening on #{address}:#{port}"
-
 command = new Command()
 command.run()

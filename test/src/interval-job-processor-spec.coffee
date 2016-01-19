@@ -1,4 +1,5 @@
 IntervalJobProcessor = require '../../src/interval-job-processor'
+IORedis = require 'ioredis'
 debug = require('debug')('mocha-test')
 
 describe 'IntervalJobProcessor', ->
@@ -7,24 +8,26 @@ describe 'IntervalJobProcessor', ->
     @queue = watchStuckJobs: sinon.spy()
     @kue.createQueue = sinon.spy => @queue
     @kue.Job.get = sinon.spy()
+    @redis = new IORedis
+    @meshbluMessage = message: sinon.stub()
     dependencies = {}
     dependencies.kue = @kue
-    dependencies.IORedis = IORedis
-    dependencies.MeshbluMessage = MeshbluMessage
-    options =
+    options = {
       minTimeDiff : 150
+      @redis
+      @meshbluMessage
+    }
 
     @sut = new IntervalJobProcessor options, dependencies
 
   describe '->processJob', ->
     describe 'when called with a job', ->
       beforeEach (done) ->
-
         @sut.getJobs = sinon.stub().yields null, ['some-node-id']
         @sut.removeJobs = sinon.stub()
         @sut.getJobInfo = sinon.stub().yields null, [ true, 60000, 0 ]
-        @sut.redis.sadd = sinon.stub()
         @sut.createJob = sinon.stub().yields null, id: 'a-new-job-id'
+        @sut.createPingJob = sinon.stub().yields null, id: 'a-new-ping-job-id'
         @job = data: {sendTo: 'some-flow-id', nodeId: 'some-node-id'}, id: 'some-job-id'
         @sut.processJob @job, {}, (@error) => done()
 
@@ -43,37 +46,15 @@ describe 'IntervalJobProcessor', ->
       it 'should call createJob', ->
         expect(@sut.createJob).to.have.been.called
 
-      it 'should call redis.sadd', ->
-        expect(@sut.redis.sadd).to.have.been.calledWith "interval/job/some-flow-id/some-node-id"
+      it 'should add a job', (done) ->
+        @redis.exists 'interval/job/some-flow-id/some-node-id', (error, record) =>
+          expect(JSON.parse record).to.equal 1
+          done error
 
-    describe 'when called with another job', ->
-      beforeEach (done) ->
-
-        @sut.getJobs = sinon.stub().yields null, ['another-node-id']
-        @sut.removeJobs = sinon.stub()
-        @sut.getJobInfo = sinon.stub().yields null, [ true, 60000, 0 ]
-        @sut.createJob = sinon.stub().yields null, id: 'another-new-job-id'
-        @sut.redis.sadd = sinon.stub()
-        @job = data: {sendTo: 'another-flow-id', nodeId: 'another-node-id'}, id: 'another-job-id'
-        @sut.processJob @job, {}, (@error) => done()
-
-      it 'should not have an error', ->
-        expect(@error).to.not.exist
-
-      it 'should call getJobs', ->
-        expect(@sut.getJobs).to.have.been.calledWith @job
-
-      it 'should call removeJobs', ->
-        expect(@sut.removeJobs).to.have.been.calledWith ['another-node-id']
-
-      it 'should call getJobInfo', ->
-        expect(@sut.getJobInfo).to.have.been.calledWith @job
-
-      it 'should call createJob', ->
-        expect(@sut.createJob).to.have.been.called
-
-      it 'should call redis.sadd', ->
-        expect(@sut.redis.sadd).to.have.been.calledWith "interval/job/another-flow-id/another-node-id"
+      it 'should add a pingJob', (done) ->
+        @redis.exists 'interval/pingJob/some-flow-id/some-node-id', (error, record) =>
+          expect(JSON.parse record).to.equal 1
+          done error
 
   describe '->getJobs', ->
     describe 'when called with a job', ->
@@ -172,7 +153,6 @@ describe 'IntervalJobProcessor', ->
         expect(@jobInfo).to.deep.equal jobInfo
 
   describe '->calculateNextCronInterval', ->
-
     describe 'using a real date with milliseconds set to 0', ->
       now = new Date
       now.setMilliseconds(0)
@@ -377,12 +357,3 @@ describe 'IntervalJobProcessor', ->
           expect(nextDate.getSeconds()).to.equal 0
           expect(nextDate.getMilliseconds()).to.equal 0
           expect(result).to.equals(900150)
-
-class IORedis
-  srem: =>
-  smembers: =>
-  mget: =>
-  sadd: =>
-
-class MeshbluMessage
-  message: =>

@@ -2,10 +2,10 @@
   "name": "nanocyte-interval-service",
   "version": "1.1.0",
   "description": "Simple interval service for nanocytes",
-  "main": "interval-service.js",
+  "main": "command.js",
   "scripts": {
     "test": "mocha",
-    "start": "node interval-service.js"
+    "start": "node command.js"
   },
   "repository": {
     "type": "git",

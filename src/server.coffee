@@ -1,4 +1,5 @@
 IntervalJobProcessor = require './interval-job-processor'
+debug = require('debug')('nanocyte-interval-service:server')
 
 class Server
   constructor: (@options={},dependencies={})->
@@ -22,10 +23,10 @@ class Server
 
     @queue.watchStuckJobs()
     debug 'kueWorker queue start'
-    
-    intervalJobProcessor = new IntervalJobProcessor {@intervalTTL,@minTimeDiff,@intervalAttempts}
 
-    @queue.process 'interval', @intervalJobs, intervalJobProcessor
+    intervalJobProcessor = new IntervalJobProcessor {@intervalTTL,@minTimeDiff,@intervalAttempts,@redis,@meshbluMessage,@queue}
+
+    @queue.process 'interval', @intervalJobs, intervalJobProcessor.processJob
     # @queue.process 'ping', @intervalJobs, @processPingJob
     callback()
 

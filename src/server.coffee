@@ -1,0 +1,32 @@
+IntervalJobProcessor = require './interval-job-processor'
+
+class Server
+  constructor: (@options={},dependencies={})->
+    {@intervalTTL,@intervalJobs,@intervalAttempts,@intervalPromotion} = @options
+    {@minTimeDiff,@redisPort,@redisHost} = @options
+    debug 'start KueWorker constructor'
+    @kue = dependencies.kue ? require 'kue'
+    IORedis = dependencies.IORedis ? require 'ioredis'
+    MeshbluMessage = dependencies.MeshbluMessage ? require './meshblu-message'
+    @redis = new IORedis @redisPort, @redisHost
+    @meshbluMessage = new MeshbluMessage
+
+  run: (callback) =>
+    @queue = @kue.createQueue
+      jobEvents: false
+      redis:
+        port: @redisPort
+        host: @redisHost
+      promotion:
+        interval: @intervalPromotion
+
+    @queue.watchStuckJobs()
+    debug 'kueWorker queue start'
+    
+    intervalJobProcessor = new IntervalJobProcessor {@intervalTTL,@minTimeDiff,@intervalAttempts}
+
+    @queue.process 'interval', @intervalJobs, intervalJobProcessor
+    # @queue.process 'ping', @intervalJobs, @processPingJob
+    callback()
+
+module.exports = Server

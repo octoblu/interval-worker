@@ -1,9 +1,8 @@
-KueWorker = require '../../src/kue-worker'
+IntervalJobProcessor = require '../../src/interval-job-processor'
 debug = require('debug')('mocha-test')
 
-describe 'KueWorker', ->
+describe 'IntervalJobProcessor', ->
   beforeEach ->
-    process.env.MIN_TIME_DIFF=150
     @kue = { Job:{} }
     @queue = watchStuckJobs: sinon.spy()
     @kue.createQueue = sinon.spy => @queue
@@ -12,7 +11,10 @@ describe 'KueWorker', ->
     dependencies.kue = @kue
     dependencies.IORedis = IORedis
     dependencies.MeshbluMessage = MeshbluMessage
-    @sut = new KueWorker dependencies
+    options =
+      minTimeDiff : 150
+
+    @sut = new IntervalJobProcessor options, dependencies
 
   describe '->processJob', ->
     describe 'when called with a job', ->

@@ -6,15 +6,6 @@ cronParser = require 'cron-parser'
 class KueWorker
   constructor: (dependencies={})->
     debug 'start KueWorker constructor'
-
-    @INTERVAL_TTL       = Number.parseInt(process.env.INTERVAL_TTL)       or 10000
-    @INTERVAL_JOBS      = Number.parseInt(process.env.INTERVAL_JOBS)      or 10
-    @INTERVAL_ATTEMPTS  = Number.parseInt(process.env.INTERVAL_ATTEMPTS)  or 999
-    @INTERVAL_PROMOTION = Number.parseInt(process.env.INTERVAL_PROMOTION) or 50
-    @MIN_TIME_DIFF      = Number.parseInt(process.env.MIN_TIME_DIFF)      or 500
-    @REDIS_PORT         = Number.parseInt(process.env.REDIS_PORT)         or 6379
-    @REDIS_HOST         = process.env.REDIS_HOST ? 'localhost'
-
     @kue = dependencies.kue ? require 'kue'
     IORedis = dependencies.IORedis ? require 'ioredis'
     MeshbluMessage = dependencies.MeshbluMessage ? require './meshblu-message'
@@ -36,6 +27,7 @@ class KueWorker
   start: =>
     debug 'kueWorker queue start'
     @queue.process 'interval', @INTERVAL_JOBS, @processJob
+    @queue.process 'ping', @INTERVAL_JOBS, @processPingJob
 
   processJob: (job, ctx, done) =>
     debug 'processing interval job', job.id, 'data', JSON.stringify job.data
@@ -71,7 +63,9 @@ class KueWorker
             done()
 
         @createJob job.data, intervalTime, (err, newJob) =>
+          @createPingJob job.data, intervalTime, (err, pingJob) =>
           @redis.sadd "interval/job/#{job.data.sendTo}/#{job.data.nodeId}", newJob.id
+          @redis.sadd "interval/pingJob/#{job.data.sendTo}/#{job.data.nodeId}", pingJob.id
           done(err)
 
   getJobs: (job, callback=->) =>
@@ -94,6 +88,7 @@ class KueWorker
       "interval/active/#{job.data.sendTo}/#{job.data.nodeId}",
       "interval/time/#{job.data.sendTo}/#{job.data.nodeId}",
       "interval/cron/#{job.data.sendTo}/#{job.data.nodeId}"
+      # "interval/ping/#{job.data.sendTo}/#{job.data.nodeId}"
     ]
     @redis.mget keys, callback
 
@@ -112,6 +107,15 @@ class KueWorker
   createJob: (data, intervalTime, callback)=>
     job = @queue.create('interval', data).
       delay(intervalTime).
+      removeOnComplete(true).
+      attempts(@INTERVAL_ATTEMPTS).
+      ttl(@INTERVAL_TTL).
+      save (err) =>
+        callback err, job
+
+  createPingJob: (data, callback)=>
+    job = @queue.create('ping', data).
+      delay(1000 * 60 * 60).
       removeOnComplete(true).
       attempts(@INTERVAL_ATTEMPTS).
       ttl(@INTERVAL_TTL).

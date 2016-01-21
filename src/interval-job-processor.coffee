@@ -5,21 +5,21 @@ cronParser = require 'cron-parser'
 
 class IntervalJobProcessor
   constructor: (options,dependencies={}) ->
-    {@minTimeDiff,@intervalAttempts,@intervalTTL,@redis,@meshbluMessage,@queue} = options
-    {@kue} = dependencies
-    @kue ?= require 'kue'
+    {@kue,@minTimeDiff,@intervalAttempts,@intervalTTL,@redis,@meshbluMessage,@queue,@pingInterval} = options
 
-  getJobs: (job, callback=->) =>
-    @redis.srem "interval/job/#{job.data.sendTo}/#{job.data.nodeId}", job.id
-    @redis.smembers "interval/job/#{job.data.sendTo}/#{job.data.nodeId}", (err, allJobIds) =>
-      return callback err if err
-      callback null, _.without allJobIds, job.id
+  getJobs: (job, callback) =>
+    key = "interval/job/#{job.data.sendTo}/#{job.data.nodeId}"
 
-  removeJob: (jobId, callback=->) =>
-    @kue.Job.get jobId, (err, job) =>
-      return callback err if err
-      job.remove()
-      callback null
+    @redis.srem key, job.id, (error) =>
+      return callback error if error?
+      @redis.smembers key, (error, allJobIds) =>
+        return callback error if error?
+        callback null, allJobIds
+
+  removeJob: (jobId, callback) =>
+    @kue.Job.get jobId, (error, job) =>
+      job.remove() unless error?
+      callback()
 
   removeJobs: (jobIds, callback=->)=>
     async.each jobIds, @removeJob, callback
@@ -54,8 +54,10 @@ class IntervalJobProcessor
         callback err, job
 
   createPingJob: (data, callback) =>
+    data = _.clone data
+    data.noUnsubscribe = true
     job = @queue.create('ping', data).
-      delay(1000 * 60 * 60).
+      delay(@pingInterval).
       removeOnComplete(true).
       attempts(@intervalAttempts).
       ttl(@intervalTTL).
@@ -73,8 +75,8 @@ class IntervalJobProcessor
       @removeJobs jobIds unless job.data.noUnsubscribe
 
       @getJobInfo job, (err, jobInfo) =>
-        [ active, intervalTime, cronString ] = jobInfo
         return done err if err?
+        [ active, intervalTime, cronString ] = jobInfo
 
         if !active or (_.isNaN(Number intervalTime) and _.isEmpty cronString)
           return done()
@@ -90,16 +92,18 @@ class IntervalJobProcessor
           try
             intervalTime = @calculateNextCronInterval cronString, jobStartTime
             @redis.set "interval/time/#{job.data.sendTo}/#{job.data.nodeId}", intervalTime
-          catch err
-            console.err err
+          catch error
+            console.error error
             done()
+
+        jobKey = "interval/job/#{job.data.sendTo}/#{job.data.nodeId}"
 
         @createJob job.data, intervalTime, (error, newJob) =>
           return done error if error?
-          @redis.sadd "interval/job/#{job.data.sendTo}/#{job.data.nodeId}", newJob.id, =>
+          @redis.sadd jobKey, newJob.id, (error) =>
+            return done error if error?
             @createPingJob job.data, (error, pingJob) =>
               return done error if error?
-              @redis.sadd "interval/pingJob/#{job.data.sendTo}/#{job.data.nodeId}", pingJob.id, =>
-                done()
+              @redis.sadd jobKey, pingJob.id, done
 
 module.exports = IntervalJobProcessor

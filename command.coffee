@@ -10,6 +10,7 @@ class Command
       minTimeDiff:        parseInt process.env.MIN_TIME_DIFF || 500
       redisPort:          parseInt process.env.REDIS_PORT || 6379
       redisHost:          process.env.REDIS_HOST || 'localhost'
+      pingInterval:       parseInt process.env.PING_INTERVAL || (1000 * 60 * 60) # 1 hour
 
   panic: (error) =>
     console.error error.stack

@@ -1,50 +1,57 @@
 IntervalJobProcessor = require '../../src/interval-job-processor'
 IORedis = require 'ioredis'
 debug = require('debug')('mocha-test')
+async = require 'async'
 
 describe 'IntervalJobProcessor', ->
   beforeEach ->
-    @kue = { Job:{} }
-    @queue = watchStuckJobs: sinon.spy()
-    @kue.createQueue = sinon.spy => @queue
-    @kue.Job.get = sinon.spy()
+    @kue = require 'kue'
     @redis = new IORedis
     @meshbluMessage = message: sinon.stub()
     dependencies = {}
-    dependencies.kue = @kue
     options = {
       minTimeDiff : 150
       @redis
       @meshbluMessage
+      @kue
     }
 
-    @sut = new IntervalJobProcessor options, dependencies
+    @queue = @kue.createQueue
+      jobEvents: false
+
+    @sut = new IntervalJobProcessor options
+
+  beforeEach (done) ->
+    @redis.del 'interval:pong:some-flow-id:some-node-id', done
+
+  beforeEach (done) ->
+    @redis.del "interval/job/some-flow-id/some-node-id", done
+
+  beforeEach (done) ->
+    @pingJob = @queue.create 'ping', {sendTo: 'some-flow-id', nodeId: 'some-node-id'}
+    @pingJob.save done
+
+  beforeEach (done) ->
+    @intervalJob = @queue.create 'interval', {sendTo: 'some-flow-id', nodeId: 'some-node-id'}
+    @intervalJob.save done
+
+  beforeEach (done) ->
+    @redis.sadd "interval/job/some-flow-id/some-node-id", @intervalJob.id, done
+
+  beforeEach (done) ->
+    @redis.sadd "interval/job/some-flow-id/some-node-id", @pingJob.id, done
+
+  beforeEach (done) ->
+    async.series [
+      (callback) => @redis.set "interval/active/some-flow-id/some-node-id", 'active', callback
+      (callback) => @redis.set "interval/time/some-flow-id/some-node-id", 'intervalTime', callback
+      (callback) => @redis.set "interval/cron/some-flow-id/some-node-id", 'cronString', callback
+    ], done
 
   describe '->processJob', ->
     describe 'when called with a job', ->
       beforeEach (done) ->
-        @sut.getJobs = sinon.stub().yields null, ['some-node-id']
-        @sut.removeJobs = sinon.stub()
-        @sut.getJobInfo = sinon.stub().yields null, [ true, 60000, 0 ]
-        @sut.createJob = sinon.stub().yields null, id: 'a-new-job-id'
-        @sut.createPingJob = sinon.stub().yields null, id: 'a-new-ping-job-id'
-        @job = data: {sendTo: 'some-flow-id', nodeId: 'some-node-id'}, id: 'some-job-id'
-        @sut.processJob @job, {}, (@error) => done()
-
-      it 'should not have an error', ->
-        expect(@error).to.not.exist
-
-      it 'should call getJobs', ->
-        expect(@sut.getJobs).to.have.been.calledWith @job
-
-      it 'should call removeJobs', ->
-        expect(@sut.removeJobs).to.have.been.calledWith ['some-node-id']
-
-      it 'should call getJobInfo', ->
-        expect(@sut.getJobInfo).to.have.been.calledWith @job
-
-      it 'should call createJob', ->
-        expect(@sut.createJob).to.have.been.called
+        @sut.processJob @intervalJob, {}, (error) => done error
 
       it 'should add a job', (done) ->
         @redis.exists 'interval/job/some-flow-id/some-node-id', (error, record) =>
@@ -59,97 +66,28 @@ describe 'IntervalJobProcessor', ->
   describe '->getJobs', ->
     describe 'when called with a job', ->
       beforeEach (done) ->
-        @sut.redis.srem = sinon.spy()
-        @sut.redis.smembers = sinon.stub().yields null, ['some-node-id']
-        job = data: {sendTo: 'some-flow-id', nodeId: 'some-node-id'}
-        @sut.getJobs job, (@error) => done()
+        @sut.getJobs @intervalJob, (error, @jobs) => done error
 
-      it 'should not have an error', ->
-        expect(@error).to.not.exist
-
-      it 'should call redis.srem', ->
-        expect(@sut.redis.srem).to.have.been.calledWith "interval/job/some-flow-id/some-node-id"
-
-      it 'should call redis.smembers', ->
-        expect(@sut.redis.smembers).to.have.been.calledWith "interval/job/some-flow-id/some-node-id"
-
-    describe 'when called with another job', ->
-      beforeEach (done) ->
-        @sut.removeJobs = sinon.spy()
-        @sut.redis.srem = sinon.spy()
-        @sut.redis.smembers = sinon.stub().yields null, ['another-node-id']
-        job = data: {sendTo: 'another-flow-id', nodeId: 'another-node-id'}
-        @sut.getJobs job, (@error) => done()
-
-      it 'should not have an error', ->
-        expect(@error).to.not.exist
-
-      it 'should call redis.srem', ->
-        expect(@sut.redis.srem).to.have.been.calledWith "interval/job/another-flow-id/another-node-id"
-
-      it 'should call redis.smembers', ->
-        expect(@sut.redis.smembers).to.have.been.calledWith "interval/job/another-flow-id/another-node-id"
+      it 'should return a list of jobs', ->
+        expect(@jobs).to.deep.equal ["#{@pingJob.id}"]
 
   describe '->removeJob', ->
     describe 'when called with a job', ->
       beforeEach (done) ->
-        @kue.Job.get = sinon.stub().yields null, remove: sinon.spy()
-        @sut.removeJob 'some-node-id', (@error) => done()
+        @sut.removeJob @intervalJob.id, done
 
-      it 'should call kue.get with the job ids', ->
-        expect(@kue.Job.get).to.have.been.calledWith 'some-node-id'
-
-    describe 'when called with another job', ->
-      beforeEach (done) ->
-        @kue.Job.get = sinon.stub().yields null, remove: sinon.spy()
-        @sut.removeJob 'another-node-id', (@error) => done()
-
-      it 'should call kue.get with the job ids', ->
-        expect(@kue.Job.get).to.have.been.calledWith 'another-node-id'
+      it 'should remove the interval job', (done) ->
+        @kue.Job.get @intervalJob.id, (error, job) =>
+          expect(error).to.exist
+          done()
 
   describe '->getJobInfo', ->
     describe 'when called with a job', ->
       beforeEach (done) ->
-        job = data: {sendTo: 'some-flow-id', nodeId: 'some-node-id'}
-        jobInfo = [{id:'active'}, {id: 'intervalTime'}, {id: 'cronString'}]
-        @sut.redis.mget = sinon.stub().yields null, jobInfo
-        @sut.getJobInfo job, (@error, @jobInfo) => done()
-
-      it 'should not have an error', ->
-        expect(@error).to.not.exist
-
-      it 'should call redis.mget to be called with keys', ->
-        keys = [
-          "interval/active/some-flow-id/some-node-id",
-          "interval/time/some-flow-id/some-node-id",
-          "interval/cron/some-flow-id/some-node-id"
-        ]
-        expect(@sut.redis.mget).to.be.calledWith keys
+        @sut.getJobInfo @intervalJob, (error, @jobInfo) => done error
 
       it 'should yield jobInfo', ->
-        jobInfo = [{id:'active'}, {id: 'intervalTime'}, {id: 'cronString'}]
-        expect(@jobInfo).to.deep.equal jobInfo
-
-    describe 'when called with another job', ->
-      beforeEach (done) ->
-        job = data: {sendTo: 'another-flow-id', nodeId: 'another-node-id'}
-        jobInfo = [{id:'active'}, {id: 'intervalTime'}, {id: 'cronString'}]
-        @sut.redis.mget = sinon.stub().yields null, jobInfo
-        @sut.getJobInfo job, (@error, @jobInfo) => done()
-
-      it 'should not have an error', ->
-        expect(@error).to.not.exist
-
-      it 'should call redis.mget to be called with keys', ->
-        keys = [
-          "interval/active/another-flow-id/another-node-id",
-          "interval/time/another-flow-id/another-node-id",
-          "interval/cron/another-flow-id/another-node-id"
-        ]
-        expect(@sut.redis.mget).to.be.calledWith keys
-
-      it 'should yield jobInfo', ->
-        jobInfo = [{id:'active'}, {id: 'intervalTime'}, {id: 'cronString'}]
+        jobInfo = ['active', 'intervalTime', 'cronString']
         expect(@jobInfo).to.deep.equal jobInfo
 
   describe '->calculateNextCronInterval', ->

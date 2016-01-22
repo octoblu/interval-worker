@@ -31,7 +31,7 @@ class PingJobProcessor
             return callback error if error?
 
             if systemStable && parseInt(count || 0) >= 5
-              return @_removeJobs({pingJobId: job.id, sendTo, nodeId}, callback)
+              return @_disableJobs({pingJobId: job.id, sendTo, nodeId}, callback)
 
             message =
                 topic: 'ping'
@@ -48,11 +48,18 @@ class PingJobProcessor
 
             async.series tasks, callback
 
-  _removeJobs: ({pingJobId, sendTo, nodeId}, callback) =>
+  _disableJobs: ({pingJobId, sendTo, nodeId}, callback) =>
     @client.smembers "interval/job/#{sendTo}/#{nodeId}", (err, jobIds) =>
       jobIds ?= []
-      jobIds.push pingJobId
-      async.eachSeries jobIds, async.apply(@_removeJob), callback
+      async.eachSeries jobIds, async.apply(@_disableJob), (error) =>
+        return callback error if error?
+        @_removeJob pingJobId, callback
+
+  _disableJob: (jobId, callback) =>
+    @kue.Job.get jobId, (error, job) =>
+      {sendTo, nodeId} = job.data
+
+      @client.hset 'ping:disabled', "#{sendTo}:#{nodeId}", Date.now(), callback
 
   _removeJob: (jobId, callback) =>
     @kue.Job.get jobId, (error, job) =>

@@ -1,31 +1,36 @@
+_ = require 'lodash'
 IntervalJobProcessor = require '../../src/interval-job-processor'
-IORedis = require 'ioredis'
+redis = require 'fakeredis'
 debug = require('debug')('mocha-test')
 async = require 'async'
+UUID = require 'uuid'
 
 describe 'IntervalJobProcessor', ->
   beforeEach ->
     @kue = require 'kue'
-    @redis = new IORedis
+    @redisKey = UUID.v1()
+    @client = _.bindAll redis.createClient @redisKey
     @meshbluMessage = message: sinon.stub()
     dependencies = {}
-    options = {
-      minTimeDiff : 150
-      @redis
-      @meshbluMessage
-      @kue
-    }
 
     @queue = @kue.createQueue
       jobEvents: false
 
+    options = {
+      minTimeDiff : 150
+      @client
+      @meshbluMessage
+      @kue
+      @queue
+    }
+
     @sut = new IntervalJobProcessor options
 
   beforeEach (done) ->
-    @redis.del 'interval:pong:some-flow-id:some-node-id', done
+    @client.del 'interval:pong:some-flow-id:some-node-id', done
 
   beforeEach (done) ->
-    @redis.del "interval/job/some-flow-id/some-node-id", done
+    @client.del "interval/job/some-flow-id/some-node-id", done
 
   beforeEach (done) ->
     @pingJob = @queue.create 'ping', {sendTo: 'some-flow-id', nodeId: 'some-node-id'}
@@ -36,32 +41,55 @@ describe 'IntervalJobProcessor', ->
     @intervalJob.save done
 
   beforeEach (done) ->
-    @redis.sadd "interval/job/some-flow-id/some-node-id", @intervalJob.id, done
+    @client.sadd "interval/job/some-flow-id/some-node-id", @intervalJob.id, done
 
   beforeEach (done) ->
-    @redis.sadd "interval/job/some-flow-id/some-node-id", @pingJob.id, done
+    @client.set "interval/ping/some-flow-id/some-node-id", @pingJob.id, done
 
   beforeEach (done) ->
     async.series [
-      (callback) => @redis.set "interval/active/some-flow-id/some-node-id", 'active', callback
-      (callback) => @redis.set "interval/time/some-flow-id/some-node-id", 'intervalTime', callback
-      (callback) => @redis.set "interval/cron/some-flow-id/some-node-id", 'cronString', callback
+      async.apply @client.set, "interval/active/some-flow-id/some-node-id", 'true'
+      async.apply @client.set, "interval/time/some-flow-id/some-node-id", 1000
+      # async.apply @client.set, "interval/cron/some-flow-id/some-node-id", 'cronString'
     ], done
 
   describe '->processJob', ->
     describe 'when called with a job', ->
       beforeEach (done) ->
-        @sut.processJob @intervalJob, {}, (error) => done error
+        @sut.processJob @intervalJob, {}, done
 
       it 'should add a job', (done) ->
-        @redis.exists 'interval/job/some-flow-id/some-node-id', (error, record) =>
-          expect(JSON.parse record).to.equal 1
+        @client.exists 'interval/job/some-flow-id/some-node-id', (error, record) =>
+          expect(record).to.equal 1
           done error
 
       it 'should add a pingJob', (done) ->
-        @redis.exists 'interval/pingJob/some-flow-id/some-node-id', (error, record) =>
-          expect(JSON.parse record).to.equal 1
+        @client.exists 'interval/ping/some-flow-id/some-node-id', (error, record) =>
+          expect(record).to.equal 1
           done error
+
+      it 'should send a message', ->
+        expect(@meshbluMessage.message).to.have.been.called
+
+    describe 'when called with a ping:disabled job', ->
+      beforeEach (done) ->
+        @client.hset 'ping:disabled', 'some-flow-id:some-node-id', Date.now(), done
+
+      beforeEach (done) ->
+        @sut.processJob @intervalJob, {}, done
+
+      it 'should add a job', (done) ->
+        @client.exists 'interval/job/some-flow-id/some-node-id', (error, record) =>
+          expect(record).to.equal 1
+          done error
+
+      it 'should add a pingJob', (done) ->
+        @client.exists 'interval/ping/some-flow-id/some-node-id', (error, record) =>
+          expect(record).to.equal 1
+          done error
+
+      it 'should not send a message', ->
+        expect(@meshbluMessage.message).not.to.have.been.called
 
   describe '->getJobs', ->
     describe 'when called with a job', ->
@@ -69,7 +97,7 @@ describe 'IntervalJobProcessor', ->
         @sut.getJobs @intervalJob, (error, @jobs) => done error
 
       it 'should return a list of jobs', ->
-        expect(@jobs).to.deep.equal ["#{@pingJob.id}"]
+        expect(@jobs).to.deep.equal []
 
   describe '->removeJob', ->
     describe 'when called with a job', ->
@@ -87,7 +115,7 @@ describe 'IntervalJobProcessor', ->
         @sut.getJobInfo @intervalJob, (error, @jobInfo) => done error
 
       it 'should yield jobInfo', ->
-        jobInfo = ['active', 'intervalTime', 'cronString']
+        jobInfo = ['true', '1000', null]
         expect(@jobInfo).to.deep.equal jobInfo
 
   describe '->calculateNextCronInterval', ->

@@ -97,9 +97,14 @@ describe 'PingJobProcessor', ->
         it 'should not send a message', ->
           expect(@meshbluMessage.message).not.to.have.been.called
 
-        it 'should remove the interval job', (done) ->
+        it 'should not remove the interval job', (done) ->
           @kue.Job.get @intervalJob.id, (error, job) =>
-            expect(error).to.exist
+            expect(job).to.exist
+            done()
+
+        it 'should set the disabled property', (done) ->
+          @client.hget 'ping:disabled', 'ping-flow-id:some-node-id', (error, data) =>
+            expect(data).to.exist
             done()
 
         it 'should remove the ping job', (done) ->
@@ -179,10 +184,20 @@ describe 'PingJobProcessor', ->
             expect(data).to.be.null
             done()
 
+        it 'should not set the disabled property', (done) ->
+          @client.hget 'ping:disabled', 'ping-flow-id:some-node-id', (error, data) =>
+            expect(data).to.be.null
+            done()
+
         it 'should not remove the interval job', (done) ->
           @kue.Job.get @intervalJob.id, (error, job) =>
             expect(job).to.exist
             done error
+
+        it 'should not remove the ping job', (done) ->
+          @kue.Job.get @pingJob.id, (error, job) =>
+            expect(job).to.exist
+            done()
 
   describe '->isSystemStable', ->
     context 'when one pong is zero', ->

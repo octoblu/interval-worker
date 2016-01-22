@@ -5,14 +5,14 @@ cronParser = require 'cron-parser'
 
 class IntervalJobProcessor
   constructor: (options,dependencies={}) ->
-    {@kue,@minTimeDiff,@intervalAttempts,@intervalTTL,@redis,@meshbluMessage,@queue,@pingInterval} = options
+    {@kue,@minTimeDiff,@intervalAttempts,@intervalTTL,@client,@meshbluMessage,@pingInterval,@queue} = options
 
   getJobs: (job, callback) =>
     key = "interval/job/#{job.data.sendTo}/#{job.data.nodeId}"
 
-    @redis.srem key, job.id, (error) =>
+    @client.srem key, job.id, (error) =>
       return callback error if error?
-      @redis.smembers key, (error, allJobIds) =>
+      @client.smembers key, (error, allJobIds) =>
         return callback error if error?
         callback null, allJobIds
 
@@ -25,12 +25,14 @@ class IntervalJobProcessor
     async.each jobIds, @removeJob, callback
 
   getJobInfo: (job, callback) =>
+    {sendTo, nodeId} = job.data
+
     keys = [
-      "interval/active/#{job.data.sendTo}/#{job.data.nodeId}",
-      "interval/time/#{job.data.sendTo}/#{job.data.nodeId}",
-      "interval/cron/#{job.data.sendTo}/#{job.data.nodeId}"
+      "interval/active/#{sendTo}/#{nodeId}",
+      "interval/time/#{sendTo}/#{nodeId}",
+      "interval/cron/#{sendTo}/#{nodeId}"
     ]
-    @redis.mget keys, callback
+    @client.mget keys, callback
 
   calculateNextCronInterval: (cronString, currentDate) =>
     currentDate ?= new Date
@@ -62,47 +64,52 @@ class IntervalJobProcessor
       save (error) =>
         callback error, job
 
-  processJob: (job, ignore, done) =>
+  processJob: (job, ignore, callback) =>
     debug 'processing interval job', job.id, 'data', JSON.stringify job.data
     jobStartTime = new Date()
     if (!job?.data?.sendTo?) or (!job?.data?.nodeId?)
-      return done()
+      return callback()
 
     @getJobs job, (error, jobIds) =>
-      return done error if error?
+      return callback error if error?
+      {sendTo, nodeId, fireOnce} = job.data
       @removeJobs jobIds unless job.data.noUnsubscribe
 
-      @getJobInfo job, (error, jobInfo) =>
-        return done error if error?
-        [ active, intervalTime, cronString ] = jobInfo
+      @client.hexists 'ping:disabled', "#{sendTo}:#{nodeId}", (error, disabled) =>
+        return callback error if error?
 
-        if !active or (_.isNaN(Number intervalTime) and _.isEmpty cronString)
-          return done()
+        @getJobInfo job, (error, jobInfo) =>
+          return callback error if error?
+          [ active, intervalTime, cronString ] = jobInfo
 
-        @meshbluMessage.message [job.data.sendTo],
-          payload:
-            from: job.data.nodeId
-            timestamp: _.now()
+          if !active or (_.isNaN(Number intervalTime) and _.isEmpty cronString)
+            return callback()
 
-        return done() if job.data.fireOnce
+          unless disabled
+            @meshbluMessage.message [sendTo],
+              payload:
+                from: nodeId
+                timestamp: _.now()
 
-        if cronString
-          try
-            intervalTime = @calculateNextCronInterval cronString, jobStartTime
-            @redis.set "interval/time/#{job.data.sendTo}/#{job.data.nodeId}", intervalTime
-          catch error
-            console.error error
-            done()
+          return callback() if fireOnce
 
-        jobKey = "interval/job/#{job.data.sendTo}/#{job.data.nodeId}"
-        pingJobKey = "interval/ping/#{job.data.sendTo}/#{job.data.nodeId}"
+          if cronString
+            try
+              intervalTime = @calculateNextCronInterval cronString, jobStartTime
+              @client.set "interval/time/#{sendTo}/#{nodeId}", intervalTime
+            catch error
+              console.error error
+              return callback()
 
-        @createJob job.data, intervalTime, (error, newJob) =>
-          return done error if error?
-          @redis.sadd jobKey, newJob.id, (error) =>
-            return done error if error?
-            @createPingJob job.data, (error, pingJob) =>
-              return done error if error?
-              @redis.set pingJobKey, pingJob.id, done
+          jobKey = "interval/job/#{sendTo}/#{nodeId}"
+          pingJobKey = "interval/ping/#{sendTo}/#{nodeId}"
+
+          @createJob job.data, intervalTime, (error, newJob) =>
+            return callback error if error?
+            @client.sadd jobKey, newJob.id, (error) =>
+              return callback error if error?
+              @createPingJob job.data, (error, pingJob) =>
+                return callback error if error?
+                @client.set pingJobKey, pingJob.id, callback
 
 module.exports = IntervalJobProcessor

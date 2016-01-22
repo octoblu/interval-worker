@@ -59,7 +59,7 @@ class IntervalJobProcessor
     @client.get pingJobKey, (error, pingJobId) =>
       return callback error if error?
       @kue.Job.get pingJobId, (ignoreError, job) =>
-        return callback job if job?
+        return callback null, job if job?
 
         job = @queue.create('ping', data).
           delay(@pingInterval).

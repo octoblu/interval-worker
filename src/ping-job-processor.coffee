@@ -9,7 +9,7 @@ class PingJobProcessor
     {@meshbluMessage,@client,@kue,@pingInterval} = options
 
   processJob: (job, ignore, callback) =>
-    debug 'processing interval job', job.id, 'data', JSON.stringify job.data
+    debug 'processing ping job', job.id, 'data', JSON.stringify job.data
     {sendTo, nodeId} = job.data
 
     flowNodeKey = "#{sendTo}:#{nodeId}"
@@ -37,6 +37,9 @@ class PingJobProcessor
                 topic: 'ping'
                 payload:
                   from: nodeId
+                  nodeId: nodeId
+                  bucket: @_getBucket()
+                  timestamp: _.now()
 
             tasks = [
               async.apply @client.hincrby, "ping:count:#{bucket}", 'total:ping', 1

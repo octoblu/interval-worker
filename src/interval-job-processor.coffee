@@ -12,16 +12,14 @@ class IntervalJobProcessor
 
     @client.srem key, job.id, (error) =>
       return callback error if error?
-      @client.smembers key, (error, allJobIds) =>
-        return callback error if error?
-        callback null, allJobIds
+      @client.smembers key, callback
 
   removeJob: (jobId, callback) =>
     @kue.Job.get jobId, (error, job) =>
       job.remove() unless error?
       callback()
 
-  removeJobs: (jobIds, callback)=>
+  removeJobs: (jobIds, callback) =>
     async.each jobIds, @removeJob, callback
 
   getJobInfo: (job, callback) =>
@@ -56,13 +54,28 @@ class IntervalJobProcessor
         callback error, job
 
   createPingJob: (data, callback) =>
-    job = @queue.create('ping', data).
-      delay(@pingInterval).
-      removeOnComplete(true).
-      attempts(@intervalAttempts).
-      ttl(@intervalTTL).
-      save (error) =>
-        callback error, job
+    {sendTo, nodeId} = data
+    pingJobKey = "interval/ping/#{sendTo}/#{nodeId}"
+    @client.get pingJobKey, (error, pingJobId) =>
+      return callback error if error?
+      @kue.Job.get pingJobId, (ignoreError, job) =>
+        return callback job if job?
+
+        job = @queue.create('ping', data).
+          delay(@pingInterval).
+          removeOnComplete(true).
+          attempts(@intervalAttempts).
+          ttl(@intervalTTL).
+          save (error) =>
+            return callback error if error?
+            @client.set pingJobKey, job.id, (error) =>
+              callback error, job
+
+  removeJobsIfnoUnsubscribe: (job, callback) =>
+    return callback() if job.data.noUnsubscribe
+    @getJobs job, (error, jobIds) =>
+      return callback error if error?
+      @removeJobs jobIds, callback
 
   processJob: (job, ignore, callback) =>
     debug 'processing interval job', job.id, 'data', JSON.stringify job.data
@@ -70,11 +83,10 @@ class IntervalJobProcessor
     if (!job?.data?.sendTo?) or (!job?.data?.nodeId?)
       return callback()
 
-    @getJobs job, (error, jobIds) =>
+    @removeJobsIfnoUnsubscribe job, (error) =>
       return callback error if error?
-      {sendTo, nodeId, fireOnce} = job.data
-      @removeJobs jobIds unless job.data.noUnsubscribe
 
+      {sendTo, nodeId, fireOnce} = job.data
       @client.hexists 'ping:disabled', "#{sendTo}:#{nodeId}", (error, disabled) =>
         return callback error if error?
 
@@ -102,14 +114,12 @@ class IntervalJobProcessor
               return callback()
 
           jobKey = "interval/job/#{sendTo}/#{nodeId}"
-          pingJobKey = "interval/ping/#{sendTo}/#{nodeId}"
 
-          @createJob job.data, intervalTime, (error, newJob) =>
-            return callback error if error?
-            @client.sadd jobKey, newJob.id, (error) =>
+          _.delay =>
+            @createJob job.data, intervalTime, (error, newJob) =>
               return callback error if error?
-              @createPingJob job.data, (error, pingJob) =>
+              @client.sadd jobKey, newJob.id, (error) =>
                 return callback error if error?
-                @client.set pingJobKey, pingJob.id, callback
+                @createPingJob job.data, callback
 
 module.exports = IntervalJobProcessor

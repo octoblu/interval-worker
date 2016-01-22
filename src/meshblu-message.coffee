@@ -9,10 +9,11 @@ class MeshbluMessage
     @meshbluHttp = new MeshbluHttp meshbluConfig
 
   message: (uuids, data, callback=->) =>
-    payload = _.merge {}, data, devices: uuids
+    payload = _.extend {}, data, devices: uuids
     startMeshblu = _.now()
     @meshbluHttp.message payload, (error, result) =>
       doneMeshblu = _.now()
+      debug 'meshblu-message', payload
       debug 'meshblu-lag is', doneMeshblu - startMeshblu, 'ms'
       debug 'meshblu-error:', error if error?
       callback error, result

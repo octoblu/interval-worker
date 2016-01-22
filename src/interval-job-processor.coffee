@@ -21,10 +21,10 @@ class IntervalJobProcessor
       job.remove() unless error?
       callback()
 
-  removeJobs: (jobIds, callback=->)=>
+  removeJobs: (jobIds, callback)=>
     async.each jobIds, @removeJob, callback
 
-  getJobInfo: (job, callback=->) =>
+  getJobInfo: (job, callback) =>
     keys = [
       "interval/active/#{job.data.sendTo}/#{job.data.nodeId}",
       "interval/time/#{job.data.sendTo}/#{job.data.nodeId}",
@@ -50,19 +50,17 @@ class IntervalJobProcessor
       removeOnComplete(true).
       attempts(@intervalAttempts).
       ttl(@intervalTTL).
-      save (err) =>
-        callback err, job
+      save (error) =>
+        callback error, job
 
   createPingJob: (data, callback) =>
-    data = _.clone data
-    data.noUnsubscribe = true
     job = @queue.create('ping', data).
       delay(@pingInterval).
       removeOnComplete(true).
       attempts(@intervalAttempts).
       ttl(@intervalTTL).
-      save (err) =>
-        callback err, job
+      save (error) =>
+        callback error, job
 
   processJob: (job, ignore, done) =>
     debug 'processing interval job', job.id, 'data', JSON.stringify job.data
@@ -70,12 +68,12 @@ class IntervalJobProcessor
     if (!job?.data?.sendTo?) or (!job?.data?.nodeId?)
       return done()
 
-    @getJobs job, (err, jobIds) =>
-      return done err if err?
+    @getJobs job, (error, jobIds) =>
+      return done error if error?
       @removeJobs jobIds unless job.data.noUnsubscribe
 
-      @getJobInfo job, (err, jobInfo) =>
-        return done err if err?
+      @getJobInfo job, (error, jobInfo) =>
+        return done error if error?
         [ active, intervalTime, cronString ] = jobInfo
 
         if !active or (_.isNaN(Number intervalTime) and _.isEmpty cronString)
@@ -97,6 +95,7 @@ class IntervalJobProcessor
             done()
 
         jobKey = "interval/job/#{job.data.sendTo}/#{job.data.nodeId}"
+        pingJobKey = "interval/ping/#{job.data.sendTo}/#{job.data.nodeId}"
 
         @createJob job.data, intervalTime, (error, newJob) =>
           return done error if error?
@@ -104,6 +103,6 @@ class IntervalJobProcessor
             return done error if error?
             @createPingJob job.data, (error, pingJob) =>
               return done error if error?
-              @redis.sadd jobKey, pingJob.id, done
+              @redis.set pingJobKey, pingJob.id, done
 
 module.exports = IntervalJobProcessor

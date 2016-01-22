@@ -26,6 +26,7 @@
     "coffee-script": "^1.10.0",
     "cron-parser": "^1.0.0",
     "debug": "^2.2.0",
+    "fast-stats": "0.0.3",
     "ioredis": "^1.8.0",
     "kue": "^0.9.4",
     "lodash": "^3.10.1",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "chai": "^3.2.0",
     "coffee-script": "^1.10.0",
+    "fakeredis": "^1.0.2",
     "mocha": "^2.3.2",
     "sinon": "^1.16.1",
     "sinon-chai": "^2.8.0"

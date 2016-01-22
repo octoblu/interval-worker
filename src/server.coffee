@@ -26,7 +26,7 @@ class Server
     debug 'kueWorker queue start'
 
     intervalJobProcessor = new IntervalJobProcessor {@intervalTTL,@minTimeDiff,@intervalAttempts,@redis,@meshbluMessage,@queue,@kue}
-    pingJobProcessor = new PingJobProcessor {@redis,@meshbluMessage,@kue}
+    pingJobProcessor = new PingJobProcessor {@pingInterval,@redis,@meshbluMessage,@kue}
 
     @queue.process 'interval', @intervalJobs, intervalJobProcessor.processJob
     @queue.process 'ping', @intervalJobs, pingJobProcessor.processJob

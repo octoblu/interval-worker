@@ -73,6 +73,7 @@ class IntervalJobProcessor
                 timestamp: _.now()
 
           return callback() if fireOnce
+          return callback() if disabled
 
           @registerJobProcessor.createIntervalJob job.data, callback
 

@@ -17,7 +17,7 @@ class PingJobProcessor
 
     @isIntervalAvailable {sendTo, nodeId}, (error, intervalAvailable) =>
       return callback error if error?
-      return callback unless intervalAvailable
+      return callback() unless intervalAvailable
 
       @isSystemStable (error, systemStable) =>
         return callback error if error?
@@ -59,15 +59,12 @@ class PingJobProcessor
   _disableJobs: ({pingJobId, sendTo, nodeId}, callback) =>
     @client.smembers "interval/job/#{sendTo}/#{nodeId}", (err, jobIds) =>
       jobIds ?= []
-      async.eachSeries jobIds, async.apply(@_disableJob), (error) =>
+      async.eachSeries jobIds, async.apply(@_disableJob, {sendTo, nodeId}), (error) =>
         return callback error if error?
         @_removeJob pingJobId, callback
 
-  _disableJob: (jobId, callback) =>
-    @kue.Job.get jobId, (error, job) =>
-      {sendTo, nodeId} = job.data
-
-      @client.hset 'ping:disabled', "#{sendTo}:#{nodeId}", Date.now(), callback
+  _disableJob: ({sendTo, nodeId}, jobId, callback) =>
+    @client.hset 'ping:disabled', "#{sendTo}:#{nodeId}", Date.now(), callback
 
   _removeJob: (jobId, callback) =>
     @kue.Job.get jobId, (error, job) =>
@@ -98,7 +95,6 @@ class PingJobProcessor
       zeroPongs = _.any results, ([ping,pong]) => parseInt(pong) == 0
       return callback null, false if zeroPongs
 
-      debug 'stable results', results
       _.each results, ([ping,pong]) =>
         avg = parseInt(pong) / parseInt(ping)
         stats.push avg if pong?
@@ -114,10 +110,13 @@ class PingJobProcessor
     @client.del 'ping:count:total', callback
 
   isIntervalAvailable: ({sendTo,nodeId}, callback) =>
-    @client.smembers "interval/job/#{sendTo}/#{nodeId}", (error, jobIds) =>
+    @client.hexists 'ping:disabled', "#{sendTo}:#{nodeId}", (error, exists) =>
       return callback error if error?
-      async.detect jobIds, @findJob, (job) =>
-        callback null, job?
+      return callback null, false if exists
+      @client.smembers "interval/job/#{sendTo}/#{nodeId}", (error, jobIds) =>
+        return callback error if error?
+        async.detect jobIds, @findJob, (job) =>
+          callback null, job?
 
   findJob: (jobId, callback) =>
     @kue.Job.get jobId, (ignoredError, job) =>

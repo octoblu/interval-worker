@@ -18,11 +18,9 @@ class RegisterJobProcessor
 
   createPingJob: (data, callback) =>
     {sendTo, nodeId} = data
-    job = @queue.create('job', data)
+    job = @queue.create('ping', data)
       .delay(@pingInterval)
       .removeOnComplete(true)
-      .attempts(1)
-      .ttl(@createInterval)
       .save (error) =>
         return callback error if error?
         @client.set "interval/ping/#{sendTo}/#{nodeId}", job.id, callback

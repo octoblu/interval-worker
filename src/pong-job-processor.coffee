@@ -9,7 +9,7 @@ class PongJobProcessor
     {@client} = options
 
   processJob: (job, ignore, callback) =>
-    debug 'processing ping job', job.id, 'data', JSON.stringify job.data
+    debug 'processing pong job', job.id, 'data', JSON.stringify job.data
     {bucket} = job.data
 
     return callback new Error 'no data' unless bucket?

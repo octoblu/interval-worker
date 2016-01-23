@@ -46,6 +46,7 @@ class Server
 
     intervalJobProcessor = new IntervalJobProcessor options
     pingJobProcessor = new PingJobProcessor options
+    pongJobProcessor = new PongJobProcessor options
 
     @queue.process 'interval', @intervalJobs, intervalJobProcessor.processJob
     @queue.process 'ping', @intervalJobs, pingJobProcessor.processJob

@@ -3,6 +3,7 @@ IntervalJobProcessor = require './interval-job-processor'
 PingJobProcessor = require './ping-job-processor'
 PongJobProcessor = require './pong-job-processor'
 RegisterJobProcessor = require './register-job-processor'
+UnregisterJobProcessor = require './unregister-job-processor'
 debug = require('debug')('nanocyte-interval-service:server')
 
 class Server
@@ -39,6 +40,7 @@ class Server
       @kue
     }
     registerJobProcessor = new RegisterJobProcessor options
+    unregisterJobProcessor = new UnregisterJobProcessor options
 
     options.registerJobProcessor = registerJobProcessor
 
@@ -49,6 +51,7 @@ class Server
     @queue.process 'ping', @intervalJobs, pingJobProcessor.processJob
     @queue.process 'pong', @intervalJobs, pongJobProcessor.processJob
     @queue.process 'register', @intervalJobs, registerJobProcessor.processJob
+    @queue.process 'unregister', @intervalJobs, unregisterJobProcessor.processJob
     callback()
 
 module.exports = Server

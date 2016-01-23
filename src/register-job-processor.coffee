@@ -48,7 +48,10 @@ class RegisterJobProcessor
       .ttl(@intervalTTL)
       .save (error) =>
         return callback error if error?
-        @client.sadd "interval/job/#{sendTo}/#{nodeId}", job.id, callback
+        async.series [
+          async.apply @client.del, "interval/job/#{sendTo}/#{nodeId}"
+          async.apply @client.sadd, "interval/job/#{sendTo}/#{nodeId}", job.id
+        ], callback
 
   createIntervalProperties: (data, callback) =>
     {sendTo, nodeId, intervalTime, cronString, nonce} = data

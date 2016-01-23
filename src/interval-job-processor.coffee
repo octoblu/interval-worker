@@ -5,7 +5,7 @@ cronParser = require 'cron-parser'
 
 class IntervalJobProcessor
   constructor: (options,dependencies={}) ->
-    {@kue,@minTimeDiff,@intervalAttempts,@intervalTTL,@client,@meshbluMessage,@pingInterval,@queue} = options
+    {@kue,@client,@meshbluMessage,@queue,@registerJobProcessor} = options
 
   getJobs: (job, callback) =>
     key = "interval/job/#{job.data.sendTo}/#{job.data.nodeId}"
@@ -32,18 +32,6 @@ class IntervalJobProcessor
     ]
     @client.mget keys, callback
 
-  calculateNextCronInterval: (cronString, currentDate) =>
-    currentDate ?= new Date
-    timeDiff = 0
-    parser = cronParser.parseExpression cronString, currentDate: currentDate
-
-    while timeDiff <= @minTimeDiff
-      nextDate = parser.next()
-      nextDate.setMilliseconds 0
-      timeDiff = nextDate - currentDate
-
-    return timeDiff
-
   createJob: (data, intervalTime, callback)=>
     job = @queue.create('interval', data).
       delay(intervalTime).
@@ -53,25 +41,7 @@ class IntervalJobProcessor
       save (error) =>
         callback error, job
 
-  createPingJob: (data, callback) =>
-    {sendTo, nodeId} = data
-    pingJobKey = "interval/ping/#{sendTo}/#{nodeId}"
-    @client.get pingJobKey, (error, pingJobId) =>
-      return callback error if error?
-      @kue.Job.get pingJobId, (ignoreError, job) =>
-        return callback null, job if job?
-
-        job = @queue.create('ping', data).
-          delay(@pingInterval).
-          removeOnComplete(true).
-          attempts(@intervalAttempts).
-          ttl(@intervalTTL).
-          save (error) =>
-            return callback error if error?
-            @client.set pingJobKey, job.id, (error) =>
-              callback error, job
-
-  removeJobsIfnoUnsubscribe: (job, callback) =>
+  removeJobsIfNoUnsubscribe: (job, callback) =>
     return callback() if job.data.noUnsubscribe
     @getJobs job, (error, jobIds) =>
       return callback error if error?
@@ -79,11 +49,10 @@ class IntervalJobProcessor
 
   processJob: (job, ignore, callback) =>
     debug 'processing interval job', job.id, 'data', JSON.stringify job.data
-    jobStartTime = new Date()
     if (!job?.data?.sendTo?) or (!job?.data?.nodeId?)
       return callback()
 
-    @removeJobsIfnoUnsubscribe job, (error) =>
+    @removeJobsIfNoUnsubscribe job, (error) =>
       return callback error if error?
 
       {sendTo, nodeId, fireOnce} = job.data
@@ -105,21 +74,6 @@ class IntervalJobProcessor
 
           return callback() if fireOnce
 
-          if cronString
-            try
-              intervalTime = @calculateNextCronInterval cronString, jobStartTime
-              @client.set "interval/time/#{sendTo}/#{nodeId}", intervalTime
-            catch error
-              console.error error
-              return callback()
-
-          jobKey = "interval/job/#{sendTo}/#{nodeId}"
-
-          _.delay =>
-            @createJob job.data, intervalTime, (error, newJob) =>
-              return callback error if error?
-              @client.sadd jobKey, newJob.id, (error) =>
-                return callback error if error?
-                @createPingJob job.data, callback
+          @registerJobProcessor.createIntervalJob job.data, callback
 
 module.exports = IntervalJobProcessor

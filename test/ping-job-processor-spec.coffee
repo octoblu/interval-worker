@@ -1,6 +1,7 @@
 _ = require 'lodash'
 async = require 'async'
-PingJobProcessor = require '../../src/ping-job-processor'
+PingJobProcessor = require '../src/ping-job-processor'
+RegisterJobProcessor = require '../src/register-job-processor'
 redis = require 'fakeredis'
 debug = require('debug')('mocha-test')
 UUID = require 'uuid'
@@ -11,15 +12,19 @@ describe 'PingJobProcessor', ->
     @redisKey = UUID.v1()
     @client = _.bindAll redis.createClient @redisKey
     @meshbluMessage = message: sinon.stub().yields null
+
+    @queue = @kue.createQueue
+      jobEvents: false
+
     options = {
       @client
       @meshbluMessage
       @kue
       pingInterval: 100000
+      @queue
     }
-
-    @queue = @kue.createQueue
-      jobEvents: false
+    registerJobProcessor = new RegisterJobProcessor options
+    options.registerJobProcessor = registerJobProcessor
 
     @sut = new PingJobProcessor options
 
@@ -32,12 +37,6 @@ describe 'PingJobProcessor', ->
     @bucket5 = @sut._getBucket 6
 
   describe '->processJob', ->
-    beforeEach (done) ->
-      @client.del 'interval:pong:ping-flow-id:some-node-id', done
-
-    beforeEach (done) ->
-      @client.del "interval/job/ping-flow-id/some-node-id", done
-
     beforeEach (done) ->
       @pingJob = @queue.create 'ping', {sendTo: 'ping-flow-id', nodeId: 'some-node-id'}
       @pingJob.save done
@@ -80,12 +79,12 @@ describe 'PingJobProcessor', ->
             done()
 
         it 'should send a message', ->
-          message =
-            topic: "ping"
-            payload:
-              from: "some-node-id"
+          expect(@meshbluMessage.message).to.have.been.called
 
-          expect(@meshbluMessage.message).to.have.been.calledWith ['ping-flow-id'], message
+      it 'should add a pingJob', (done) ->
+        @client.exists 'interval/ping/ping-flow-id/some-node-id', (error, record) =>
+          expect(record).to.equal 1
+          done error
 
       describe 'when called with a job that has timed out', ->
         beforeEach (done) ->
@@ -97,19 +96,9 @@ describe 'PingJobProcessor', ->
         it 'should not send a message', ->
           expect(@meshbluMessage.message).not.to.have.been.called
 
-        it 'should not remove the interval job', (done) ->
-          @kue.Job.get @intervalJob.id, (error, job) =>
-            expect(job).to.exist
-            done()
-
         it 'should set the disabled property', (done) ->
           @client.hget 'ping:disabled', 'ping-flow-id:some-node-id', (error, data) =>
             expect(data).to.exist
-            done()
-
-        it 'should remove the ping job', (done) ->
-          @kue.Job.get @pingJob.id, (error, job) =>
-            expect(error).to.exist
             done()
 
       describe 'when called with a job that has previously timed out twice, but now works', ->
@@ -130,12 +119,7 @@ describe 'PingJobProcessor', ->
             done()
 
         it 'should send a message', ->
-          message =
-            topic: "ping"
-            payload:
-              from: "some-node-id"
-
-          expect(@meshbluMessage.message).to.have.been.calledWith ['ping-flow-id'], message
+          expect(@meshbluMessage.message).to.have.been.called
 
     context 'when the system is unstable', ->
       beforeEach (done) ->
@@ -165,12 +149,12 @@ describe 'PingJobProcessor', ->
             done()
 
         it 'should send a message', ->
-          message =
-            topic: "ping"
-            payload:
-              from: "some-node-id"
+          expect(@meshbluMessage.message).to.have.been.called
 
-          expect(@meshbluMessage.message).to.have.been.calledWith ['ping-flow-id'], message
+        it 'should add a pingJob', (done) ->
+          @client.exists 'interval/ping/ping-flow-id/some-node-id', (error, record) =>
+            expect(record).to.equal 1
+            done error
 
       describe 'when called with a job that has timed out', ->
         beforeEach (done) ->
@@ -189,15 +173,10 @@ describe 'PingJobProcessor', ->
             expect(data).to.be.null
             done()
 
-        it 'should not remove the interval job', (done) ->
-          @kue.Job.get @intervalJob.id, (error, job) =>
-            expect(job).to.exist
+        it 'should add a pingJob', (done) ->
+          @client.exists 'interval/ping/ping-flow-id/some-node-id', (error, record) =>
+            expect(record).to.equal 1
             done error
-
-        it 'should not remove the ping job', (done) ->
-          @kue.Job.get @pingJob.id, (error, job) =>
-            expect(job).to.exist
-            done()
 
   describe '->isSystemStable', ->
     context 'when one pong is zero', ->

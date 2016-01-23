@@ -1,12 +1,12 @@
 _          = require 'lodash'
 async      = require 'async'
-debug      = require('debug')('nanocyte-interval-service:interval-job-processor')
+debug      = require('debug')('nanocyte-interval-service:ping-job-processor')
 cronParser = require 'cron-parser'
 {Stats}    = require 'fast-stats'
 
 class PingJobProcessor
   constructor: (options) ->
-    {@meshbluMessage,@client,@kue,@pingInterval} = options
+    {@meshbluMessage,@client,@kue,@pingInterval,@queue,@registerJobProcessor} = options
 
   processJob: (job, ignore, callback) =>
     debug 'processing ping job', job.id, 'data', JSON.stringify job.data
@@ -15,41 +15,46 @@ class PingJobProcessor
     flowNodeKey = "#{sendTo}:#{nodeId}"
     bucket = @_getBucket()
 
-    @isSystemStable (error, systemStable) =>
+    @isIntervalAvailable {sendTo, nodeId}, (error, intervalAvailable) =>
       return callback error if error?
+      return callback unless intervalAvailable
 
-      @clearIfUnstable systemStable, (error) =>
+      @isSystemStable (error, systemStable) =>
         return callback error if error?
 
-        @client.hget "ping:count:total", flowNodeKey, (error, count) =>
+        @clearIfUnstable systemStable, (error) =>
           return callback error if error?
 
-          count ?= 0
-          unitStable = count <= 1
-
-          @clearIfUnstable unitStable, (error) =>
+          @client.hget "ping:count:total", flowNodeKey, (error, count) =>
             return callback error if error?
 
-            if systemStable && parseInt(count || 0) >= 5
-              return @_disableJobs({pingJobId: job.id, sendTo, nodeId}, callback)
+            count ?= 0
+            unitStable = count <= 1
 
-            message =
-                topic: 'ping'
-                payload:
-                  from: nodeId
-                  nodeId: nodeId
-                  bucket: @_getBucket()
-                  timestamp: _.now()
+            @clearIfUnstable unitStable, (error) =>
+              return callback error if error?
 
-            tasks = [
-              async.apply @client.hincrby, "ping:count:#{bucket}", 'total:ping', 1
-              async.apply @meshbluMessage.message, [sendTo], message
-            ]
+              if systemStable && parseInt(count || 0) >= 5
+                return @_disableJobs({pingJobId: job.id, sendTo, nodeId}, callback)
 
-            if systemStable
-              tasks.push async.apply @client.hincrby, 'ping:count:total', flowNodeKey, 1
+              message =
+                  topic: 'ping'
+                  payload:
+                    from: nodeId
+                    nodeId: nodeId
+                    bucket: @_getBucket()
+                    timestamp: _.now()
 
-            async.series tasks, callback
+              tasks = [
+                async.apply @client.hincrby, "ping:count:#{bucket}", 'total:ping', 1
+                async.apply @meshbluMessage.message, [sendTo], message
+                async.apply @registerJobProcessor.createPingJob, job.data
+              ]
+
+              if systemStable
+                tasks.push async.apply @client.hincrby, 'ping:count:total', flowNodeKey, 1
+
+              async.series tasks, callback
 
   _disableJobs: ({pingJobId, sendTo, nodeId}, callback) =>
     @client.smembers "interval/job/#{sendTo}/#{nodeId}", (err, jobIds) =>
@@ -86,7 +91,6 @@ class PingJobProcessor
 
     async.series tasks, (error, results) =>
       return callback error if error?
-
       stats = new Stats()
       undefinedPongs = _.any results, ([ping,pong]) => _.isUndefined(pong) || _.isNull(pong)
       return callback null, false if undefinedPongs
@@ -94,6 +98,7 @@ class PingJobProcessor
       zeroPongs = _.any results, ([ping,pong]) => parseInt(pong) == 0
       return callback null, false if zeroPongs
 
+      debug 'stable results', results
       _.each results, ([ping,pong]) =>
         avg = parseInt(pong) / parseInt(ping)
         stats.push avg if pong?
@@ -101,11 +106,21 @@ class PingJobProcessor
       dev = stats.σ()
       callback null, dev == 0 || dev.toFixed(2) <= 0.01
 
-  _getBucket: (modifier=1) =>
-    _.floor Date.now()  / (@pingInterval * modifier)
+  _getBucket: (modifier=0) =>
+    _.floor (Date.now() - (@pingInterval*modifier)) / @pingInterval
 
   clearIfUnstable: (stable, callback) =>
     return callback() if stable
     @client.del 'ping:count:total', callback
+
+  isIntervalAvailable: ({sendTo,nodeId}, callback) =>
+    @client.smembers "interval/job/#{sendTo}/#{nodeId}", (error, jobIds) =>
+      return callback error if error?
+      async.detect jobIds, @findJob, (job) =>
+        callback null, job?
+
+  findJob: (jobId, callback) =>
+    @kue.Job.get jobId, (ignoredError, job) =>
+      callback job
 
 module.exports = PingJobProcessor

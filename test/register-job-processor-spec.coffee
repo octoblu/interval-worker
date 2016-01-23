@@ -1,122 +1,100 @@
 _ = require 'lodash'
-IntervalJobProcessor = require '../../src/interval-job-processor'
+async = require 'async'
+RegisterJobProcessor = require '../src/register-job-processor'
 redis = require 'fakeredis'
 debug = require('debug')('mocha-test')
-async = require 'async'
 UUID = require 'uuid'
 
-describe 'IntervalJobProcessor', ->
+describe 'RegisterJobProcessor', ->
   beforeEach ->
     @kue = require 'kue'
     @redisKey = UUID.v1()
     @client = _.bindAll redis.createClient @redisKey
-    @meshbluMessage = message: sinon.stub()
-    dependencies = {}
 
     @queue = @kue.createQueue
       jobEvents: false
 
     options = {
-      minTimeDiff : 150
       @client
-      @meshbluMessage
       @kue
+      pingInterval: 100000
+      intervalTTL: 1000
+      intervalAttempts: 3
+      minTimeDiff: 500
       @queue
     }
 
-    @sut = new IntervalJobProcessor options
-
-  beforeEach (done) ->
-    @client.del 'interval:pong:some-flow-id:some-node-id', done
-
-  beforeEach (done) ->
-    @client.del "interval/job/some-flow-id/some-node-id", done
-
-  beforeEach (done) ->
-    @pingJob = @queue.create 'ping', {sendTo: 'some-flow-id', nodeId: 'some-node-id'}
-    @pingJob.save done
-
-  beforeEach (done) ->
-    @intervalJob = @queue.create 'interval', {sendTo: 'some-flow-id', nodeId: 'some-node-id'}
-    @intervalJob.save done
-
-  beforeEach (done) ->
-    @client.sadd "interval/job/some-flow-id/some-node-id", @intervalJob.id, done
-
-  beforeEach (done) ->
-    @client.set "interval/ping/some-flow-id/some-node-id", @pingJob.id, done
-
-  beforeEach (done) ->
-    async.series [
-      async.apply @client.set, "interval/active/some-flow-id/some-node-id", 'true'
-      async.apply @client.set, "interval/time/some-flow-id/some-node-id", 1000
-      # async.apply @client.set, "interval/cron/some-flow-id/some-node-id", 'cronString'
-    ], done
+    @sut = new RegisterJobProcessor options
 
   describe '->processJob', ->
-    describe 'when called with a job', ->
+    context 'with intervalTime', ->
       beforeEach (done) ->
-        @sut.processJob @intervalJob, {}, done
+        @registerJob = @queue.create 'register', {
+          sendTo: 'register-flow-id'
+          nodeId: 'some-node-id'
+          intervalTime: 1000
+          nonce: 'this-is-nonce'
+        }
+        @registerJob.save done
 
-      it 'should add a job', (done) ->
-        @client.exists 'interval/job/some-flow-id/some-node-id', (error, record) =>
-          expect(record).to.equal 1
-          done error
+      beforeEach (done) ->
+        @sut.processJob @registerJob, {}, done
 
       it 'should add a pingJob', (done) ->
-        @client.exists 'interval/ping/some-flow-id/some-node-id', (error, record) =>
-          expect(record).to.equal 1
-          done error
+        @client.get 'interval/ping/register-flow-id/some-node-id', (error, jobId) =>
+          return done error if error?
+          @kue.Job.get jobId, (error, job) =>
+            return done error if error?
+            expect(job).to.exist
+            done()
 
-      it 'should send a message', ->
-        expect(@meshbluMessage.message).to.have.been.called
+      it 'should add a intervalJob', (done) ->
+        @client.smembers 'interval/job/register-flow-id/some-node-id', (error, jobIds) =>
+          return done error if error?
+          @kue.Job.get _.first(jobIds), (error, job) =>
+            return done error if error?
+            expect(job).to.exist
+            done()
 
-    describe 'when called with a ping:disabled job', ->
-      beforeEach (done) ->
-        @client.hset 'ping:disabled', 'some-flow-id:some-node-id', Date.now(), done
-
-      beforeEach (done) ->
-        @sut.processJob @intervalJob, {}, done
-
-      it 'should add a job', (done) ->
-        @client.exists 'interval/job/some-flow-id/some-node-id', (error, record) =>
-          expect(record).to.equal 1
-          done error
-
-      it 'should add a pingJob', (done) ->
-        @client.exists 'interval/ping/some-flow-id/some-node-id', (error, record) =>
-          expect(record).to.equal 1
-          done error
-
-      it 'should not send a message', ->
-        expect(@meshbluMessage.message).not.to.have.been.called
-
-  describe '->getJobs', ->
-    describe 'when called with a job', ->
-      beforeEach (done) ->
-        @sut.getJobs @intervalJob, (error, @jobs) => done error
-
-      it 'should return a list of jobs', ->
-        expect(@jobs).to.deep.equal []
-
-  describe '->removeJob', ->
-    describe 'when called with a job', ->
-      beforeEach (done) ->
-        @sut.removeJob @intervalJob.id, done
-
-      it 'should remove the interval job', (done) ->
-        @kue.Job.get @intervalJob.id, (error, job) =>
-          expect(error).to.exist
+      it 'should set interval redis stuff', (done) ->
+        @client.mget [
+          "interval/active/register-flow-id/some-node-id"
+          "interval/time/register-flow-id/some-node-id"
+          "interval/cron/register-flow-id/some-node-id"
+          "interval/nonce/register-flow-id/some-node-id"
+        ], (error, results) =>
+          return done error if error?
+          expect(results).to.deep.equal ['true', '1000', '', 'this-is-nonce']
           done()
 
-  describe '->getJobInfo', ->
-    describe 'when called with a job', ->
+    context 'with cronString', ->
       beforeEach (done) ->
-        @sut.getJobInfo @intervalJob, (error, @jobInfo) => done error
+        @registerJob = @queue.create 'register', {
+          sendTo: 'register-cron-flow-id'
+          nodeId: 'some-node-id'
+          cronString: '* * * * *'
+          nonce: 'this-is-nonce'
+        }
+        @registerJob.save done
 
-      it 'should yield jobInfo', ->
-        jobInfo = ['true', '1000', null]
-        expect(@jobInfo).to.deep.equal jobInfo
+      beforeEach (done) ->
+        @sut.processJob @registerJob, {}, done
+
+      it 'should add a pingJob', (done) ->
+        @client.get 'interval/ping/register-cron-flow-id/some-node-id', (error, jobId) =>
+          return done error if error?
+          @kue.Job.get jobId, (error, job) =>
+            return done error if error?
+            expect(job).to.exist
+            done()
+
+      it 'should add a intervalJob', (done) ->
+        @client.smembers 'interval/job/register-cron-flow-id/some-node-id', (error, jobIds) =>
+          return done error if error?
+          @kue.Job.get _.first(jobIds), (error, job) =>
+            return done error if error?
+            expect(job).to.exist
+            done()
 
   describe '->calculateNextCronInterval', ->
     describe 'using a real date with milliseconds set to 0', ->

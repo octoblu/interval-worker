@@ -29,7 +29,7 @@ class RegisterJobProcessor
 
   createIntervalJob: (data, callback) =>
     {cronString, sendTo, nodeId, intervalTime} = data
-    if cronString? && !_.isBlank cronString
+    if cronString? && !_.isEmpty cronString
       try
         intervalTime = @calculateNextCronInterval cronString
         @client.set "interval/time/#{sendTo}/#{nodeId}", intervalTime
@@ -56,6 +56,7 @@ class RegisterJobProcessor
   createIntervalProperties: (data, callback) =>
     {sendTo, nodeId, intervalTime, cronString, nonce} = data
     @client.mset "interval/active/#{sendTo}/#{nodeId}", 'true',
+      "interval/origTime/#{sendTo}/#{nodeId}", intervalTime || '',
       "interval/time/#{sendTo}/#{nodeId}", intervalTime || '',
       "interval/cron/#{sendTo}/#{nodeId}", cronString || '',
       "interval/nonce/#{sendTo}/#{nodeId}", nonce || ''

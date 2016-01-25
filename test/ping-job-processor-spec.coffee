@@ -15,6 +15,9 @@ describe 'PingJobProcessor', ->
 
     @queue = @kue.createQueue
       jobEvents: false
+      redis:
+        createClientFactory: =>
+         redis.createClient @redisKey
 
     options = {
       @client
@@ -100,26 +103,6 @@ describe 'PingJobProcessor', ->
           @client.hget 'ping:disabled', 'ping-flow-id:some-node-id', (error, data) =>
             expect(data).to.exist
             done()
-
-      describe 'when called with a job that has previously timed out twice, but now works', ->
-        beforeEach (done) ->
-          @client.hset 'ping:count:total', 'ping-flow-id:some-node-id', 2, done
-
-        beforeEach (done) ->
-          @sut.processJob @pingJob, {}, done
-
-        it 'should increment the node ping count from zero', (done) ->
-          @client.hget 'ping:count:total', 'ping-flow-id:some-node-id', (error, data) =>
-            expect(parseInt(data)).to.equal 1
-            done()
-
-        it 'should increment the total ping count', (done) ->
-          @client.hget "ping:count:#{@bucket}", 'total:ping', (error, data) =>
-            expect(parseInt(data)).to.equal 2
-            done()
-
-        it 'should send a message', ->
-          expect(@meshbluMessage.message).to.have.been.called
 
     context 'when the system is unstable', ->
       beforeEach (done) ->

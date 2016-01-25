@@ -1,5 +1,6 @@
 _ = require 'lodash'
 async = require 'async'
+RegisterJobProcessor = require '../src/register-job-processor'
 UnregisterJobProcessor = require '../src/unregister-job-processor'
 redis = require 'fakeredis'
 debug = require('debug')('mocha-test')
@@ -13,6 +14,9 @@ describe 'UnregisterJobProcessor', ->
 
     @queue = @kue.createQueue
       jobEvents: false
+      redis:
+        createClientFactory: =>
+         redis.createClient @redisKey
 
     options = {
       @client
@@ -23,6 +27,9 @@ describe 'UnregisterJobProcessor', ->
       minTimeDiff: 500
       @queue
     }
+
+    registerJobProcessor = new RegisterJobProcessor options
+    options.registerJobProcessor = registerJobProcessor
 
     @sut = new UnregisterJobProcessor options
 
@@ -85,3 +92,19 @@ describe 'UnregisterJobProcessor', ->
           expect(results.cron).to.equal 0
           expect(results.nonce).to.equal 0
           done()
+
+    context 'when nonce does not match', ->
+      beforeEach (done) ->
+        @unregisterJob = @queue.create 'unregister', {
+          sendTo: 'unregister-flow-id'
+          nodeId: 'some-node-id'
+          intervalTime: 1000
+          nonce: 'i-am-not-nonce'
+        }
+        @unregisterJob.save done
+
+      beforeEach (done) ->
+        @sut.processJob @unregisterJob, {}, (@error) => done()
+
+      it 'should yield an error', ->
+        expect(@error).to.exist

@@ -16,8 +16,9 @@ class IntervalJobProcessor
 
   removeJob: (jobId, callback) =>
     @kue.Job.get jobId, (error, job) =>
-      job.remove() unless error?
-      callback()
+      return callback() if error?
+      job.remove =>
+        callback()
 
   removeJobs: (jobIds, callback) =>
     async.each jobIds, @removeJob, callback
@@ -73,7 +74,6 @@ class IntervalJobProcessor
                 timestamp: _.now()
 
           return callback() if fireOnce
-          return callback() if disabled
 
           @registerJobProcessor.createIntervalJob job.data, callback
 

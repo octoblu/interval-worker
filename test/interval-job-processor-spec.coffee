@@ -16,6 +16,9 @@ describe 'IntervalJobProcessor', ->
 
     @queue = @kue.createQueue
       jobEvents: false
+      redis:
+        createClientFactory: =>
+         redis.createClient @redisKey
 
     options = {
       minTimeDiff : 150

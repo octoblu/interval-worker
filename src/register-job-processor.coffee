@@ -11,6 +11,8 @@ class RegisterJobProcessor
   processJob: (job, ignore, callback) =>
     debug 'processing register job', job.id, 'data', JSON.stringify job.data
     async.series [
+      async.apply @doUnregister, job.data
+      async.apply @removeDisabledKey, job.data
       async.apply @createIntervalProperties, job.data
       async.apply @createIntervalJob, job.data
       async.apply @createPingJob, job.data
@@ -70,5 +72,36 @@ class RegisterJobProcessor
       timeDiff = nextDate - currentDate
 
     return timeDiff
+
+  removeDisabledKey: ({sendTo,nodeId}, callback) =>
+    @client.del 'ping:disabled', "#{sendTo}:#{nodeId}", callback
+
+  doUnregister: ({sendTo, nodeId}, callback) =>
+    async.series [
+      async.apply @removeIntervalProperties, {sendTo, nodeId}
+      async.apply @removeIntervalJobs, {sendTo, nodeId}
+      async.apply @removePingJob, {sendTo, nodeId}
+    ], callback
+
+  removeIntervalProperties: ({sendTo, nodeId}, callback) =>
+      @client.del "interval/active/#{sendTo}/#{nodeId}",
+      "interval/time/#{sendTo}/#{nodeId}",
+      "interval/cron/#{sendTo}/#{nodeId}",
+      "interval/nonce/#{sendTo}/#{nodeId}", callback
+
+  removeIntervalJobs: ({sendTo, nodeId}, callback) =>
+    @client.smembers "interval/job/#{sendTo}/#{nodeId}", (error, jobIds) =>
+      return callback error if error?
+      async.each jobIds, @removeJob, callback
+
+  removePingJob: ({sendTo, nodeId}, callback) =>
+    @client.get "interval/ping/#{sendTo}/#{nodeId}", (error, jobId) =>
+      return callback error if error?
+      @removeJob jobId, callback
+
+  removeJob: (jobId, callback) =>
+    @kue.Job.get jobId, (error, job) =>
+      job.remove() unless error?
+      callback()
 
 module.exports = RegisterJobProcessor

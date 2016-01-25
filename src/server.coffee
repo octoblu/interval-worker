@@ -40,13 +40,15 @@ class Server
       @kue
     }
     registerJobProcessor = new RegisterJobProcessor options
-    unregisterJobProcessor = new UnregisterJobProcessor options
-
     options.registerJobProcessor = registerJobProcessor
 
     intervalJobProcessor = new IntervalJobProcessor options
     pingJobProcessor = new PingJobProcessor options
     pongJobProcessor = new PongJobProcessor options
+    unregisterJobProcessor = new UnregisterJobProcessor options
+
+    @queue.on 'error', (error) =>
+      console.error 'Queue error:', error
 
     @queue.process 'interval', @intervalJobs, intervalJobProcessor.processJob
     @queue.process 'ping', @intervalJobs, pingJobProcessor.processJob

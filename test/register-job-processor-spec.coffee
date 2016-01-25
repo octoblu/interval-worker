@@ -13,6 +13,9 @@ describe 'RegisterJobProcessor', ->
 
     @queue = @kue.createQueue
       jobEvents: false
+      redis:
+        createClientFactory: =>
+         redis.createClient @redisKey
 
     options = {
       @client
@@ -65,6 +68,86 @@ describe 'RegisterJobProcessor', ->
         ], (error, results) =>
           return done error if error?
           expect(results).to.deep.equal ['true', '1000', '', 'this-is-nonce']
+          done()
+
+    context 'a previously disabled flow/node combination', ->
+      beforeEach (done) ->
+        @client.hset 'ping:disabled', 'register-flow-id:some-node-id', Date.now(), done
+
+      beforeEach (done) ->
+        @registerJob = @queue.create 'register', {
+          sendTo: 'register-flow-id'
+          nodeId: 'some-node-id'
+          intervalTime: 1000
+          nonce: 'this-is-nonce'
+        }
+        @registerJob.save done
+
+      beforeEach (done) ->
+        @sut.processJob @registerJob, {}, done
+
+      it 'should add a pingJob', (done) ->
+        @client.get 'interval/ping/register-flow-id/some-node-id', (error, jobId) =>
+          return done error if error?
+          @kue.Job.get jobId, (error, job) =>
+            return done error if error?
+            expect(job).to.exist
+            done()
+
+      it 'should add a intervalJob', (done) ->
+        @client.smembers 'interval/job/register-flow-id/some-node-id', (error, jobIds) =>
+          return done error if error?
+          @kue.Job.get _.first(jobIds), (error, job) =>
+            return done error if error?
+            expect(job).to.exist
+            done()
+
+      it 'should remove the disabled key redis stuff', (done) ->
+        @client.hexists 'ping:disabled', 'register-flow-id:some-node-id', (error, results) =>
+          return done error if error?
+          expect(results).to.equal 0
+          done()
+
+    context 'when a job already exists', ->
+      beforeEach (done) ->
+        @pingJob = @queue.create 'ping', {sendTo: 'unregister-flow-id', nodeId: 'some-node-id'}
+        @pingJob.save done
+
+      beforeEach (done) ->
+        @intervalJob = @queue.create 'interval', {sendTo: 'unregister-flow-id', nodeId: 'some-node-id'}
+        @intervalJob.save done
+
+      beforeEach (done) ->
+        @client.sadd "interval/job/unregister-flow-id/some-node-id", @intervalJob.id, done
+
+      beforeEach (done) ->
+        @client.set "interval/nonce/unregister-flow-id/some-node-id", 'i-am-nonce', done
+
+      beforeEach (done) ->
+        @client.set "interval/ping/unregister-flow-id/some-node-id", @pingJob.id, done
+
+      beforeEach (done) ->
+        @registerJob = @queue.create 'unregister', {
+          sendTo: 'unregister-flow-id'
+          nodeId: 'some-node-id'
+          intervalTime: 1000
+          nonce: 'i-am-nonce'
+        }
+        @registerJob.save done
+
+      beforeEach (done) ->
+        @sut.processJob @registerJob, {}, done
+
+      it 'should delete the pingJob', (done) ->
+        @kue.Job.get @pingJob.id, (error, job) =>
+          expect(error).to.exist
+          expect(job).not.to.exist
+          done()
+
+      it 'should delete the intervalJob', (done) ->
+        @kue.Job.get @intervalJob.id, (error, job) =>
+          expect(error).to.exist
+          expect(job).not.to.exist
           done()
 
     context 'with cronString', ->

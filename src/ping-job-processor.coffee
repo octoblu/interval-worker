@@ -22,39 +22,37 @@ class PingJobProcessor
       @isSystemStable (error, systemStable) =>
         return callback error if error?
 
+        debug 'isSystemStable?', systemStable
+
         @clearIfUnstable systemStable, (error) =>
           return callback error if error?
 
           @client.hget "ping:count:total", flowNodeKey, (error, count) =>
             return callback error if error?
+            debug 'ping:count:total', flowNodeKey, count
 
             count ?= 0
-            unitStable = count <= 1
+            if systemStable && parseInt(count || 0) >= 5
+              return @_disableJobs({pingJobId: job.id, sendTo, nodeId}, callback)
 
-            @clearIfUnstable unitStable, (error) =>
-              return callback error if error?
+            message =
+                topic: 'ping'
+                payload:
+                  from: nodeId
+                  nodeId: nodeId
+                  bucket: @_getBucket()
+                  timestamp: _.now()
 
-              if systemStable && parseInt(count || 0) >= 5
-                return @_disableJobs({pingJobId: job.id, sendTo, nodeId}, callback)
+            tasks = [
+              async.apply @client.hincrby, "ping:count:#{bucket}", 'total:ping', 1
+              async.apply @meshbluMessage.message, [sendTo], message
+              async.apply @registerJobProcessor.createPingJob, job.data
+            ]
 
-              message =
-                  topic: 'ping'
-                  payload:
-                    from: nodeId
-                    nodeId: nodeId
-                    bucket: @_getBucket()
-                    timestamp: _.now()
+            if systemStable
+              tasks.push async.apply @client.hincrby, 'ping:count:total', flowNodeKey, 1
 
-              tasks = [
-                async.apply @client.hincrby, "ping:count:#{bucket}", 'total:ping', 1
-                async.apply @meshbluMessage.message, [sendTo], message
-                async.apply @registerJobProcessor.createPingJob, job.data
-              ]
-
-              if systemStable
-                tasks.push async.apply @client.hincrby, 'ping:count:total', flowNodeKey, 1
-
-              async.series tasks, callback
+            async.series tasks, callback
 
   _disableJobs: ({pingJobId, sendTo, nodeId}, callback) =>
     @client.smembers "interval/job/#{sendTo}/#{nodeId}", (err, jobIds) =>
@@ -113,13 +111,6 @@ class PingJobProcessor
     @client.hexists 'ping:disabled', "#{sendTo}:#{nodeId}", (error, exists) =>
       return callback error if error?
       return callback null, false if exists
-      @client.smembers "interval/job/#{sendTo}/#{nodeId}", (error, jobIds) =>
-        return callback error if error?
-        async.detect jobIds, @findJob, (job) =>
-          callback null, job?
-
-  findJob: (jobId, callback) =>
-    @kue.Job.get jobId, (ignoredError, job) =>
-      callback job
+      callback null, true
 
 module.exports = PingJobProcessor

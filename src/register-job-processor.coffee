@@ -29,7 +29,7 @@ class RegisterJobProcessor
 
   createIntervalJob: (data, callback) =>
     {cronString, sendTo, nodeId, intervalTime} = data
-    if cronString?
+    if cronString? && !_.isBlank cronString
       try
         intervalTime = @calculateNextCronInterval cronString
         @client.set "interval/time/#{sendTo}/#{nodeId}", intervalTime
@@ -39,7 +39,7 @@ class RegisterJobProcessor
 
     data.intervalTime = intervalTime
 
-    return callback new Error "invalid intervalTime: #{intervalTime}" unless intervalTime >= 1000
+    return callback new Error "invalid intervalTime: #{intervalTime}" if intervalTime < 1000
 
     job = @queue.create('interval', data)
       .delay(intervalTime)

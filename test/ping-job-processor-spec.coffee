@@ -49,10 +49,13 @@ describe 'PingJobProcessor', ->
       @intervalJob.save done
 
     beforeEach (done) ->
+      @client.set "interval/active/ping-flow-id/some-node-id", "true", done
+
+    beforeEach (done) ->
       @client.sadd "interval/job/ping-flow-id/some-node-id", @intervalJob.id, done
 
     beforeEach (done) ->
-      @client.sadd "interval/ping/ping-flow-id/some-node-id", @pingJob.id, done
+      @client.set "interval/ping/ping-flow-id/some-node-id", @pingJob.id, done
 
     context 'when the system is stable', ->
       beforeEach (done) ->

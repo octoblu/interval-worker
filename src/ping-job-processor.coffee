@@ -110,7 +110,9 @@ class PingJobProcessor
   isIntervalAvailable: ({sendTo,nodeId}, callback) =>
     @client.hexists 'ping:disabled', "#{sendTo}:#{nodeId}", (error, exists) =>
       return callback error if error?
-      return callback null, false if exists
-      callback null, true
+      return callback null, false if exists == 1
+      @client.exists "interval/active/#{sendTo}/#{nodeId}", (error, exists) =>
+        return callback error if error?
+        callback null, exists == 1
 
 module.exports = PingJobProcessor

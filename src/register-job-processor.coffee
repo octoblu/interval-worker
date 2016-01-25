@@ -14,8 +14,8 @@ class RegisterJobProcessor
       async.apply @doUnregister, job.data
       async.apply @removeDisabledKey, job.data
       async.apply @createIntervalProperties, job.data
-      async.apply @createIntervalJob, job.data
       async.apply @createPingJob, job.data
+      async.apply @createIntervalJob, job.data
     ], callback
 
   createPingJob: (data, callback) =>
@@ -35,7 +35,9 @@ class RegisterJobProcessor
         @client.set "interval/time/#{sendTo}/#{nodeId}", intervalTime
       catch error
         console.error error
-        return callback()
+        @client.exists "interval/ping/#{sendTo}/#{nodeId}", (error, exists) =>
+          return callback() if error or exists == 1
+          @createPingJob data, callback
 
     data.intervalTime = intervalTime
 

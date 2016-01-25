@@ -108,6 +108,30 @@ describe 'RegisterJobProcessor', ->
           expect(results).to.equal 0
           done()
 
+    context 'an interval that does not have a ping job', ->
+      beforeEach (done) ->
+        @client.del 'interval/ping/register-flow-id/some-node-id', done
+
+      beforeEach (done) ->
+        @registerJob = @queue.create 'register', {
+          sendTo: 'register-flow-id'
+          nodeId: 'some-node-id'
+          intervalTime: 1000
+          nonce: 'this-is-nonce'
+        }
+        @registerJob.save done
+
+      beforeEach (done) ->
+        @sut.processJob @registerJob, {}, done
+
+      it 'should add a pingJob', (done) ->
+        @client.get 'interval/ping/register-flow-id/some-node-id', (error, jobId) =>
+          return done error if error?
+          @kue.Job.get jobId, (error, job) =>
+            return done error if error?
+            expect(job).to.exist
+            done()
+
     context 'when a job already exists', ->
       beforeEach (done) ->
         @pingJob = @queue.create 'ping', {sendTo: 'unregister-flow-id', nodeId: 'some-node-id'}

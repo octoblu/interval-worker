@@ -30,6 +30,7 @@ class IntervalJobProcessor
       "interval/active/#{sendTo}/#{nodeId}",
       "interval/time/#{sendTo}/#{nodeId}",
       "interval/cron/#{sendTo}/#{nodeId}"
+      "interval/nonce/#{sendTo}/#{nodeId}"
     ]
     @client.mget keys, callback
 
@@ -62,7 +63,7 @@ class IntervalJobProcessor
 
         @getJobInfo job, (error, jobInfo) =>
           return callback error if error?
-          [ active, intervalTime, cronString ] = jobInfo
+          [ active, intervalTime, cronString, nonce ] = jobInfo
 
           if !active or (_.isNaN(Number intervalTime) and _.isEmpty cronString)
             return callback()
@@ -75,6 +76,11 @@ class IntervalJobProcessor
 
           return callback() if fireOnce
 
-          @registerJobProcessor.createIntervalJob job.data, callback
+          data = _.clone job.data
+          data.intervalTime = intervalTime
+          data.cronString = cronString
+          data.nonce = nonce
+
+          @registerJobProcessor.createIntervalJob data, callback
 
 module.exports = IntervalJobProcessor

@@ -77,7 +77,7 @@ class RegisterJobProcessor
     return timeDiff
 
   removeDisabledKey: ({sendTo,nodeId}, callback) =>
-    @client.del 'ping:disabled', "#{sendTo}:#{nodeId}", callback
+    @client.hdel 'ping:disabled', "#{sendTo}:#{nodeId}", callback
 
   doUnregister: ({sendTo, nodeId}, callback) =>
     async.series [

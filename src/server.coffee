@@ -12,9 +12,9 @@ class Server
     {@minTimeDiff,@redisPort,@redisHost,@pingInterval} = @options
     debug 'start KueWorker constructor'
     @kue = dependencies.kue ? require 'kue'
-    redis = dependencies.redis ? require 'redis'
+    redis = dependencies.redis ? require 'ioredis'
     MeshbluMessage = dependencies.MeshbluMessage ? require './meshblu-message'
-    @client = _.bindAll redis.createClient @redisPort, @redisHost
+    @client = _.bindAll redis.createClient @redisPort, @redisHost, dropBufferSupport: true
     @meshbluMessage = new MeshbluMessage
 
   run: (callback) =>

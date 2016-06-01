@@ -3,10 +3,12 @@ MAINTAINER Octoblu <docker@octoblu.com>
 
 EXPOSE 80
 
+ENV NPM_CONFIG_LOGLEVEL error
+
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
 COPY . /usr/src/app
-RUN npm install --production
+RUN npm -s install --production
 
-CMD [ "npm", "start" ]
+CMD [ "node", "command.js" ]

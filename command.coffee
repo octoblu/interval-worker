@@ -21,5 +21,9 @@ class Command
     server.run (error) =>
       return @panic error if error?
 
+    process.on 'SIGTERM', =>
+      console.log 'SIGTERM caught, exiting'
+      process.exit 0
+
 command = new Command()
 command.run()

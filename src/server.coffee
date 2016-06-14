@@ -39,6 +39,10 @@ class Server
       @queue
       @kue
     }
+    debug {@pingInterval}
+    debug {@intervalTTL}
+    debug {@minTimeDiff}
+
     registerJobProcessor = new RegisterJobProcessor options
     options.registerJobProcessor = registerJobProcessor
 

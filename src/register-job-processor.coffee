@@ -40,8 +40,10 @@ class RegisterJobProcessor
           @createPingJob data, callback
 
     data.intervalTime = intervalTime
-
-    return callback new Error "invalid intervalTime: #{intervalTime}" if intervalTime < 1000
+    if intervalTime < @minTimeDiff
+      console.error new Error "invalid intervalTime: #{intervalTime}"
+      console.error {data}
+      return callback()
 
     job = @queue.create('interval', data)
       .delay(intervalTime)
@@ -68,7 +70,6 @@ class RegisterJobProcessor
     currentDate ?= new Date
     timeDiff = 0
     parser = cronParser.parseExpression cronString, currentDate: currentDate
-
     while timeDiff <= @minTimeDiff
       nextDate = parser.next()
       nextDate.setMilliseconds 0

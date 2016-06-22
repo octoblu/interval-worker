@@ -17,7 +17,16 @@ class Server
     @client = _.bindAll redis.createClient @redisPort, @redisHost, dropBufferSupport: true
     @meshbluMessage = new MeshbluMessage
 
+  writeTest: =>
+    @client.set 'test:write', Date.now(), (error) =>
+      if error?
+        console.error error.stack
+        console.log "Write failed, exiting..."
+        process.exit 1
+
   run: (callback) =>
+    setInterval @writeTest, 5000
+
     @queue = @kue.createQueue
       jobEvents: false
       redis:

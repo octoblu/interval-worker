@@ -1,5 +1,5 @@
 {
-  "name": "nanocyte-interval-service",
+  "name": "interval-worker",
   "version": "2.4.0",
   "description": "Simple interval service for nanocytes",
   "main": "command.js",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/octoblu/nanocyte-interval-service.git"
+    "url": "git+https://github.com/octoblu/interval-worker.git"
   },
   "keywords": [
     "nanocyte",
@@ -18,26 +18,26 @@
   "author": "Octoblu <npm@octoblu.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/octoblu/nanocyte-interval-service/issues"
+    "url": "https://github.com/octoblu/interval-worker/issues"
   },
-  "homepage": "https://github.com/octoblu/nanocyte-interval-service#readme",
+  "homepage": "https://github.com/octoblu/interval-worker#readme",
   "dependencies": {
-    "async": "^1.4.2",
+    "async": "^2.0.0-rc.6",
     "coffee-script": "^1.10.0",
-    "cron-parser": "^1.0.0",
+    "cron-parser": "^2.1.0",
     "debug": "^2.2.0",
     "fast-stats": "0.0.3",
-    "ioredis": "^2.0.1",
-    "kue": "^0.9.4",
-    "lodash": "^3.10.1",
-    "meshblu-config": "^4.0.0",
-    "meshblu-http": "^5.5.0",
+    "ioredis": "^2.2.0",
+    "kue": "^0.11.1",
+    "lodash": "^4.13.1",
+    "meshblu-config": "^5.1.2",
+    "meshblu-http": "^7.0.0",
     "uuid": "^2.0.2"
   },
   "devDependencies": {
     "chai": "^3.2.0",
     "coffee-script": "^1.10.0",
-    "fakeredis": "^1.0.2",
+    "fakeredis": "^1.0.3",
     "mocha": "^2.3.2",
     "sinon": "^1.16.1",
     "sinon-chai": "^2.8.0"

@@ -9,7 +9,8 @@ describe 'RegisterJobProcessor', ->
   beforeEach ->
     @kue = require 'kue'
     @redisKey = UUID.v1()
-    @client = _.bindAll redis.createClient @redisKey
+    @client = redis.createClient @redisKey
+    @client = _.bindAll @client, _.functionsIn(@client)
 
     @queue = @kue.createQueue
       jobEvents: false

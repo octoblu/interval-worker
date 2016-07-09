@@ -1,7 +1,6 @@
 _          = require 'lodash'
 async      = require 'async'
 debug      = require('debug')('nanocyte-interval-service:interval-job-processor')
-cronParser = require 'cron-parser'
 
 class IntervalJobProcessor
   constructor: (options,dependencies={}) ->

@@ -9,7 +9,7 @@ class MeshbluMessage
     @meshbluHttp = new MeshbluHttp meshbluConfig
 
   message: (uuids, data, callback=->) =>
-    payload = _.extend {}, data, devices: uuids
+    payload = _.assign {}, data, devices: uuids
     startMeshblu = _.now()
     @meshbluHttp.message payload, (error, result) =>
       doneMeshblu = _.now()

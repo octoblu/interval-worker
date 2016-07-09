@@ -2,7 +2,6 @@ _          = require 'lodash'
 async      = require 'async'
 debug      = require('debug')('nanocyte-interval-service:register-job-processor')
 cronParser = require 'cron-parser'
-{Stats}    = require 'fast-stats'
 
 class RegisterJobProcessor
   constructor: (options) ->
@@ -34,7 +33,7 @@ class RegisterJobProcessor
         intervalTime = @calculateNextCronInterval cronString
         @client.set "interval/time/#{sendTo}/#{nodeId}", intervalTime
       catch error
-        console.error error
+        console.error 'createIntervalJob', error
         @client.exists "interval/ping/#{sendTo}/#{nodeId}", (error, exists) =>
           return callback() if error or exists == 1
           @createPingJob data, callback
@@ -104,6 +103,7 @@ class RegisterJobProcessor
       @removeJob jobId, callback
 
   removeJob: (jobId, callback) =>
+    return callback() unless jobId?
     @kue.Job.get jobId, (error, job) =>
       job.remove() unless error?
       callback()

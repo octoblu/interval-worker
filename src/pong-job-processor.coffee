@@ -1,8 +1,6 @@
 _          = require 'lodash'
 async      = require 'async'
 debug      = require('debug')('nanocyte-interval-service:pong-job-processor')
-cronParser = require 'cron-parser'
-{Stats}    = require 'fast-stats'
 
 class PongJobProcessor
   constructor: (options) ->

@@ -1,7 +1,6 @@
 _          = require 'lodash'
 async      = require 'async'
 debug      = require('debug')('nanocyte-interval-service:ping-job-processor')
-cronParser = require 'cron-parser'
 {Stats}    = require 'fast-stats'
 
 class PingJobProcessor
@@ -87,10 +86,10 @@ class PingJobProcessor
     async.series tasks, (error, results) =>
       return callback error if error?
       stats = new Stats()
-      undefinedPongs = _.any results, ([ping,pong]) => _.isUndefined(pong) || _.isNull(pong)
+      undefinedPongs = _.some results, ([ping,pong]) => _.isUndefined(pong) || _.isNull(pong)
       return callback null, false if undefinedPongs
 
-      zeroPongs = _.any results, ([ping,pong]) => parseInt(pong) == 0
+      zeroPongs = _.some results, ([ping,pong]) => parseInt(pong) == 0
       return callback null, false if zeroPongs
 
       _.each results, ([ping,pong]) =>

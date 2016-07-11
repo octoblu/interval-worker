@@ -104,6 +104,7 @@ class RegisterJobProcessor
       @removeJob jobId, callback
 
   removeJob: (jobId, callback) =>
+    return callback() unless jobId?
     @kue.Job.get jobId, (error, job) =>
       job.remove() unless error?
       callback()

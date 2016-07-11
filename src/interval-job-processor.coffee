@@ -15,6 +15,7 @@ class IntervalJobProcessor
       @client.smembers key, callback
 
   removeJob: (jobId, callback) =>
+    return callback() unless jobId?
     @kue.Job.get jobId, (error, job) =>
       return callback() if error?
       job.remove =>

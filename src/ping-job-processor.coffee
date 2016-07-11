@@ -64,6 +64,7 @@ class PingJobProcessor
     @client.hset 'ping:disabled', "#{sendTo}:#{nodeId}", Date.now(), callback
 
   _removeJob: (jobId, callback) =>
+    return callback() unless jobId?
     @kue.Job.get jobId, (error, job) =>
       job.remove() unless error?
       callback()

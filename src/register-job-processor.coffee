@@ -70,9 +70,10 @@ class RegisterJobProcessor
     timeDiff = 0
     parser = cronParser.parseExpression cronString, currentDate: currentDate
     while timeDiff <= @minTimeDiff
-      nextDate = parser.next()
-      nextDate.setMilliseconds 0
-      timeDiff = nextDate - currentDate
+      nextDate = parser.next()?.toDate()
+      if nextDate?
+        nextDate.setMilliseconds 0
+        timeDiff = nextDate - currentDate
 
     return timeDiff
 

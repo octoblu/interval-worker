@@ -6,6 +6,7 @@ RegisterJobProcessor   = require './register-job-processor'
 UnregisterJobProcessor = require './unregister-job-processor'
 debug                  = require('debug')('nanocyte-interval-service:server')
 Redis                  = require 'ioredis'
+MeshbluConfig          = require 'meshblu-config'
 
 class IntervalWorker
   constructor: (@options={},dependencies={})->
@@ -20,8 +21,6 @@ class IntervalWorker
     } = @options
     debug 'start KueWorker constructor'
     @kue = dependencies.kue ? require 'kue'
-    MeshbluMessage = dependencies.MeshbluMessage ? require './meshblu-message'
-    @meshbluMessage = new MeshbluMessage
 
   writeTest: =>
     @client.set 'test:write', Date.now(), (error) =>
@@ -55,9 +54,9 @@ class IntervalWorker
         @minTimeDiff
         @intervalAttempts
         @client
-        @meshbluMessage
         @queue
         @kue
+        meshbluConfig: new MeshbluConfig().toJSON()
       }
       debug {@pingInterval}
       debug {@intervalTTL}

@@ -1,10 +1,17 @@
 _          = require 'lodash'
 async      = require 'async'
+MeshbluHttp = require 'meshblu-http'
 debug      = require('debug')('nanocyte-interval-service:interval-job-processor')
 
 class IntervalJobProcessor
   constructor: (options,dependencies={}) ->
-    {@kue,@client,@meshbluMessage,@queue,@registerJobProcessor} = options
+    {
+      @kue
+      @client
+      @queue
+      @registerJobProcessor
+      @meshbluConfig
+    } = options
 
   getJobs: (job, callback) =>
     key = "interval/job/#{job.data.sendTo}/#{job.data.nodeId}"
@@ -31,6 +38,8 @@ class IntervalJobProcessor
       "interval/time/#{sendTo}/#{nodeId}",
       "interval/cron/#{sendTo}/#{nodeId}"
       "interval/nonce/#{sendTo}/#{nodeId}"
+      "interval/uuid/#{sendTo}/#{nodeId}"
+      "interval/token/#{sendTo}/#{nodeId}"
     ]
     @client.mget keys, callback
 
@@ -63,16 +72,22 @@ class IntervalJobProcessor
 
         @getJobInfo job, (error, jobInfo) =>
           return callback error if error?
-          [ active, intervalTime, cronString, nonce ] = jobInfo
+          [ active, intervalTime, cronString, nonce, uuid, token ] = jobInfo
 
           if !active or (_.isNaN(Number intervalTime) and _.isEmpty cronString)
             return callback()
 
           unless disabled
-            @meshbluMessage.message [sendTo],
+            console.log {uuid, token}
+            config = _.assign {uuid, token}, @meshbluConfig
+            meshbluHttp = new MeshbluHttp config
+            message =
+              devices: [sendTo]
               payload:
                 from: nodeId
                 timestamp: _.now()
+
+            meshbluHttp.message message
 
           return callback() if fireOnce
 

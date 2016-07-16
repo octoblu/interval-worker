@@ -78,7 +78,6 @@ class IntervalJobProcessor
             return callback()
 
           unless disabled
-            console.log {uuid, token}
             config = _.assign {uuid, token}, @meshbluConfig
             meshbluHttp = new MeshbluHttp config
             message =

@@ -100,5 +100,5 @@ describe 'IntervalJobProcessor', ->
         @sut.getJobInfo @intervalJob, (error, @jobInfo) => done error
 
       it 'should yield jobInfo', ->
-        jobInfo = ['true', '1000', null, null, null, null]
+        jobInfo = ['true', '1000', undefined, undefined, undefined, undefined]
         expect(@jobInfo).to.deep.equal jobInfo

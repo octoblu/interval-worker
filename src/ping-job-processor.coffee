@@ -1,11 +1,20 @@
-_          = require 'lodash'
-async      = require 'async'
-debug      = require('debug')('nanocyte-interval-service:ping-job-processor')
-{Stats}    = require 'fast-stats'
+_           = require 'lodash'
+async       = require 'async'
+debug       = require('debug')('nanocyte-interval-service:ping-job-processor')
+MeshbluHttp = require 'meshblu-http'
+{Stats}     = require 'fast-stats'
 
 class PingJobProcessor
-  constructor: (options) ->
-    {@meshbluMessage,@client,@kue,@pingInterval,@queue,@registerJobProcessor} = options
+  constructor: (options, dependencies={}) ->
+    {
+      @meshbluConfig
+      @client
+      @kue
+      @pingInterval
+      @queue
+      @registerJobProcessor
+    } = options
+    @MeshbluHttp = dependencies.MeshbluHttp ? MeshbluHttp
 
   processJob: (job, ignore, callback) =>
     debug 'processing ping job', job.id, 'data', JSON.stringify job.data
@@ -34,24 +43,37 @@ class PingJobProcessor
             if systemStable && parseInt(count || 0) >= 5
               return @_disableJobs({pingJobId: job.id, sendTo, nodeId}, callback)
 
-            message =
-                topic: 'ping'
-                payload:
-                  from: nodeId
-                  nodeId: nodeId
-                  bucket: @_getBucket()
-                  timestamp: _.now()
-
-            tasks = [
-              async.apply @client.hincrby, "ping:count:#{bucket}", 'total:ping', 1
-              async.apply @meshbluMessage.message, [sendTo], message
-              async.apply @registerJobProcessor.createPingJob, job.data
+            keys = [
+              "interval/uuid/#{sendTo}/#{nodeId}"
+              "interval/token/#{sendTo}/#{nodeId}"
             ]
+            @client.mget keys, (error, result) =>
+              return callback error if error?
 
-            if systemStable
-              tasks.push async.apply @client.hincrby, 'ping:count:total', flowNodeKey, 1
+              [uuid, token] = result
 
-            async.series tasks, callback
+              config = _.defaults {uuid, token}, @meshbluConfig
+              meshbluHttp = new @MeshbluHttp config
+
+              message =
+                  devices: [sendTo]
+                  topic: 'ping'
+                  payload:
+                    from: nodeId
+                    nodeId: nodeId
+                    bucket: @_getBucket()
+                    timestamp: _.now()
+
+              tasks = [
+                async.apply @client.hincrby, "ping:count:#{bucket}", 'total:ping', 1
+                async.apply meshbluHttp.message, message
+                async.apply @registerJobProcessor.createPingJob, job.data
+              ]
+
+              if systemStable
+                tasks.push async.apply @client.hincrby, 'ping:count:total', flowNodeKey, 1
+
+              async.series tasks, callback
 
   _disableJobs: ({pingJobId, sendTo, nodeId}, callback) =>
     @client.smembers "interval/job/#{sendTo}/#{nodeId}", (err, jobIds) =>

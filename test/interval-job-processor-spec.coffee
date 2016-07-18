@@ -12,8 +12,10 @@ describe 'IntervalJobProcessor', ->
     @redisKey = UUID.v1()
     @client = redis.createClient @redisKey
     @client = _.bindAll @client, _.functionsIn(@client)
-    @meshbluMessage = message: sinon.stub()
-    dependencies = {}
+    @meshbluHttp = message: sinon.stub()
+    MeshbluHttp = =>
+      @meshbluHttp
+    dependencies = {MeshbluHttp}
 
     @queue = @kue.createQueue
       jobEvents: false
@@ -24,14 +26,13 @@ describe 'IntervalJobProcessor', ->
     options = {
       minTimeDiff : 150
       @client
-      @meshbluMessage
       @kue
       @queue
     }
 
     registerJobProcessor = new RegisterJobProcessor options
     options.registerJobProcessor = registerJobProcessor
-    @sut = new IntervalJobProcessor options
+    @sut = new IntervalJobProcessor options, dependencies
 
   beforeEach (done) ->
     @intervalJob = @queue.create 'interval', {sendTo: 'some-flow-id', nodeId: 'some-node-id', intervalTime: 1000}
@@ -58,7 +59,7 @@ describe 'IntervalJobProcessor', ->
           done error
 
       it 'should send a message', ->
-        expect(@meshbluMessage.message).to.have.been.called
+        expect(@meshbluHttp.message).to.have.been.called
 
     describe 'when called with a ping:disabled job', ->
       beforeEach (done) ->
@@ -73,7 +74,7 @@ describe 'IntervalJobProcessor', ->
           done error
 
       it 'should not send a message', ->
-        expect(@meshbluMessage.message).not.to.have.been.called
+        expect(@meshbluHttp.message).not.to.have.been.called
 
   describe '->getJobs', ->
     describe 'when called with a job', ->
@@ -99,5 +100,5 @@ describe 'IntervalJobProcessor', ->
         @sut.getJobInfo @intervalJob, (error, @jobInfo) => done error
 
       it 'should yield jobInfo', ->
-        jobInfo = ['true', '1000', null, null]
+        jobInfo = ['true', '1000', null, null, null, null]
         expect(@jobInfo).to.deep.equal jobInfo

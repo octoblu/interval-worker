@@ -12,7 +12,10 @@ describe 'PingJobProcessor', ->
     @redisKey = UUID.v1()
     @client = redis.createClient @redisKey
     @client = _.bindAll @client, _.functionsIn(@client)
-    @meshbluMessage = message: sinon.stub().yields null
+    @meshbluHttp = message: sinon.stub().yields null
+    MeshbluHttp = =>
+      @meshbluHttp
+    dependencies = {MeshbluHttp}
 
     @queue = @kue.createQueue
       jobEvents: false
@@ -22,7 +25,6 @@ describe 'PingJobProcessor', ->
 
     options = {
       @client
-      @meshbluMessage
       @kue
       pingInterval: 100000
       @queue
@@ -30,7 +32,7 @@ describe 'PingJobProcessor', ->
     registerJobProcessor = new RegisterJobProcessor options
     options.registerJobProcessor = registerJobProcessor
 
-    @sut = new PingJobProcessor options
+    @sut = new PingJobProcessor options, dependencies
 
   beforeEach ->
     @bucket = @sut._getBucket()
@@ -86,7 +88,7 @@ describe 'PingJobProcessor', ->
             done()
 
         it 'should send a message', ->
-          expect(@meshbluMessage.message).to.have.been.called
+          expect(@meshbluHttp.message).to.have.been.called
 
       it 'should add a pingJob', (done) ->
         @client.exists 'interval/ping/ping-flow-id/some-node-id', (error, record) =>
@@ -101,7 +103,7 @@ describe 'PingJobProcessor', ->
           @sut.processJob @pingJob, {}, done
 
         it 'should not send a message', ->
-          expect(@meshbluMessage.message).not.to.have.been.called
+          expect(@meshbluHttp.message).not.to.have.been.called
 
         it 'should set the disabled property', (done) ->
           @client.hget 'ping:disabled', 'ping-flow-id:some-node-id', (error, data) =>
@@ -136,7 +138,7 @@ describe 'PingJobProcessor', ->
             done()
 
         it 'should send a message', ->
-          expect(@meshbluMessage.message).to.have.been.called
+          expect(@meshbluHttp.message).to.have.been.called
 
         it 'should add a pingJob', (done) ->
           @client.exists 'interval/ping/ping-flow-id/some-node-id', (error, record) =>

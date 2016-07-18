@@ -95,8 +95,6 @@ class IntervalJobProcessor
 
             meshbluHttp.message message
 
-            console.log {config, message}
-
           return callback() if fireOnce
 
           data = _.clone job.data

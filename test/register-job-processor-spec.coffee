@@ -39,7 +39,7 @@ describe 'RegisterJobProcessor', ->
           intervalTime: 1000
           nonce: 'this-is-nonce'
         }
-        @registerJob.save done
+        @registerJob.events(false).save done
 
       beforeEach (done) ->
         @sut.processJob @registerJob, {}, done
@@ -82,7 +82,7 @@ describe 'RegisterJobProcessor', ->
           intervalTime: 1000
           nonce: 'this-is-nonce'
         }
-        @registerJob.save done
+        @registerJob.events(false).save done
 
       beforeEach (done) ->
         @sut.processJob @registerJob, {}, done
@@ -120,7 +120,7 @@ describe 'RegisterJobProcessor', ->
           intervalTime: 1000
           nonce: 'this-is-nonce'
         }
-        @registerJob.save done
+        @registerJob.events(false).save done
 
       beforeEach (done) ->
         @sut.processJob @registerJob, {}, done
@@ -136,11 +136,11 @@ describe 'RegisterJobProcessor', ->
     context 'when a job already exists', ->
       beforeEach (done) ->
         @pingJob = @queue.create 'ping', {sendTo: 'unregister-flow-id', nodeId: 'some-node-id'}
-        @pingJob.save done
+        @pingJob.events(false).save done
 
       beforeEach (done) ->
         @intervalJob = @queue.create 'interval', {sendTo: 'unregister-flow-id', nodeId: 'some-node-id'}
-        @intervalJob.save done
+        @intervalJob.events(false).save done
 
       beforeEach (done) ->
         @client.sadd "interval/job/unregister-flow-id/some-node-id", @intervalJob.id, done
@@ -158,7 +158,7 @@ describe 'RegisterJobProcessor', ->
           intervalTime: 1000
           nonce: 'i-am-nonce'
         }
-        @registerJob.save done
+        @registerJob.events(false).save done
 
       beforeEach (done) ->
         @sut.processJob @registerJob, {}, done
@@ -183,7 +183,7 @@ describe 'RegisterJobProcessor', ->
           cronString: '* * * * *'
           nonce: 'this-is-nonce'
         }
-        @registerJob.save done
+        @registerJob.events(false).save done
 
       beforeEach (done) ->
         @sut.processJob @registerJob, {}, done

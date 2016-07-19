@@ -28,7 +28,7 @@ describe 'PongJobProcessor', ->
     context 'when an interval is ok', ->
       beforeEach (done) ->
         @pongJob = @queue.create 'pong', {sendTo: 'some-flow-id', nodeId: 'some-node-id', bucket: 'the-bucket'}
-        @pongJob.save done
+        @pongJob.events(false).save done
 
       beforeEach (done) ->
         @sut.processJob @pongJob, {}, done
@@ -49,7 +49,7 @@ describe 'PongJobProcessor', ->
 
       beforeEach (done) ->
         @pongJob = @queue.create 'pong', {sendTo: 'some-flow-id', nodeId: 'some-node-id', bucket: 'the-bucket'}
-        @pongJob.save done
+        @pongJob.events(false).save done
 
       beforeEach (done) ->
         @sut.processJob @pongJob, {}, done

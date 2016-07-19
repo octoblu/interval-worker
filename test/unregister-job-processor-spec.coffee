@@ -37,11 +37,11 @@ describe 'UnregisterJobProcessor', ->
   describe '->processJob', ->
     beforeEach (done) ->
       @pingJob = @queue.create 'ping', {sendTo: 'unregister-flow-id', nodeId: 'some-node-id'}
-      @pingJob.save done
+      @pingJob.events(false).save done
 
     beforeEach (done) ->
       @intervalJob = @queue.create 'interval', {sendTo: 'unregister-flow-id', nodeId: 'some-node-id'}
-      @intervalJob.save done
+      @intervalJob.events(false).save done
 
     beforeEach (done) ->
       @client.sadd "interval/job/unregister-flow-id/some-node-id", @intervalJob.id, done
@@ -60,7 +60,7 @@ describe 'UnregisterJobProcessor', ->
           intervalTime: 1000
           nonce: 'i-am-nonce'
         }
-        @unregisterJob.save done
+        @unregisterJob.events(false).save done
 
       beforeEach (done) ->
         @sut.processJob @unregisterJob, {}, done
@@ -102,7 +102,7 @@ describe 'UnregisterJobProcessor', ->
           intervalTime: 1000
           nonce: 'i-am-not-nonce'
         }
-        @unregisterJob.save done
+        @unregisterJob.events(false).save done
 
       beforeEach (done) ->
         @sut.processJob @unregisterJob, {}, (@error) => done()

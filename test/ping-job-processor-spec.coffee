@@ -45,11 +45,11 @@ describe 'PingJobProcessor', ->
   describe '->processJob', ->
     beforeEach (done) ->
       @pingJob = @queue.create 'ping', {sendTo: 'ping-flow-id', nodeId: 'some-node-id'}
-      @pingJob.save done
+      @pingJob.events(false).save done
 
     beforeEach (done) ->
       @intervalJob = @queue.create 'interval', {sendTo: 'ping-flow-id', nodeId: 'some-node-id'}
-      @intervalJob.save done
+      @intervalJob.events(false).save done
 
     beforeEach (done) ->
       @client.set "interval/active/ping-flow-id/some-node-id", "true", done

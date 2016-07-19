@@ -51,12 +51,13 @@ class IntervalJobProcessor
       callback null, results
 
   createJob: (data, intervalTime, callback)=>
-    job = @queue.create('interval', data).
-      delay(intervalTime).
-      removeOnComplete(true).
-      attempts(@intervalAttempts).
-      ttl(@intervalTTL).
-      save (error) =>
+    job = @queue.create('interval', data)
+      .events(false)
+      .delay(intervalTime)
+      .removeOnComplete(true)
+      .attempts(@intervalAttempts)
+      .ttl(@intervalTTL)
+      .save (error) =>
         callback error, job
 
   removeJobsIfNoUnsubscribe: (job, callback) =>

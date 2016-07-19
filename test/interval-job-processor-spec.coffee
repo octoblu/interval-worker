@@ -36,7 +36,7 @@ describe 'IntervalJobProcessor', ->
 
   beforeEach (done) ->
     @intervalJob = @queue.create 'interval', {sendTo: 'some-flow-id', nodeId: 'some-node-id', intervalTime: 1000}
-    @intervalJob.save done
+    @intervalJob.events(false).save done
 
   beforeEach (done) ->
     @client.sadd "interval/job/some-flow-id/some-node-id", @intervalJob.id, done

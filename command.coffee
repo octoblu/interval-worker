@@ -23,10 +23,16 @@ class Command
     worker.run (error) =>
       return @panic error if error?
 
-    process.on 'SIGTERM', =>
+    process.on 'SIGINT', =>
+      console.log 'SIGINT caught, exiting'
       worker.stop (error) =>
         return @panic error if error?
-        console.log 'SIGTERM caught, exiting'
+        process.exit 0
+
+    process.on 'SIGTERM', =>
+      console.log 'SIGTERM caught, exiting'
+      worker.stop (error) =>
+        return @panic error if error?
         process.exit 0
 
 command = new Command()

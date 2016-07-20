@@ -22,6 +22,9 @@ class IntervalWorker
     debug 'start KueWorker constructor'
     @kue = dependencies.kue ? require 'kue'
 
+  stop: (callback) =>
+    @queue.shutdown 5000, callback
+
   writeTest: =>
     @client.set 'test:write', Date.now(), (error) =>
       if error?

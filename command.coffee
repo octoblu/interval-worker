@@ -19,13 +19,15 @@ class Command
   run: =>
     @panic new Error('Missing required environment variable: REDIS_URI') if _.isEmpty @options.redisUri
 
-    server = new IntervalWorker @options
-    server.run (error) =>
+    worker = new IntervalWorker @options
+    worker.run (error) =>
       return @panic error if error?
 
     process.on 'SIGTERM', =>
-      console.log 'SIGTERM caught, exiting'
-      process.exit 0
+      worker.stop (error) =>
+        return @panic error if error?
+        console.log 'SIGTERM caught, exiting'
+        process.exit 0
 
 command = new Command()
 command.run()

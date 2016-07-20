@@ -76,11 +76,11 @@ class IntervalWorker
       @queue.on 'error', (error) =>
         console.error 'Queue error:', error
 
+      @queue.process 'register', @intervalJobs, registerJobProcessor.processJob
       @queue.process 'interval', @intervalJobs, intervalJobProcessor.processJob
+      @queue.process 'unregister', @intervalJobs, unregisterJobProcessor.processJob
       @queue.process 'ping', @intervalJobs, pingJobProcessor.processJob
       @queue.process 'pong', @intervalJobs, pongJobProcessor.processJob
-      @queue.process 'register', @intervalJobs, registerJobProcessor.processJob
-      @queue.process 'unregister', @intervalJobs, unregisterJobProcessor.processJob
       callback()
 
 module.exports = IntervalWorker

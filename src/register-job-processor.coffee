@@ -18,7 +18,8 @@ class RegisterJobProcessor
     ], callback
 
   createPingJob: (data, callback) =>
-    {sendTo, nodeId} = data
+    {sendTo, nodeId, fireOnce} = data
+    return callback() if fireOnce
     job = @queue.create('ping', data)
       .ttl(5000)
       .events(false)
@@ -28,36 +29,41 @@ class RegisterJobProcessor
         return callback error if error?
         @client.set "interval/ping/#{sendTo}/#{nodeId}", job.id, callback
 
+  updateCronIntervalTime: ({cronString, sendTo, nodeId}, callback) =>
+    return callback() if _.isEmpty cronString
+    try
+      intervalTime = @calculateNextCronInterval cronString
+    catch error
+      console.error 'calculateNextCronInterval', error
+      return callback() if error?
+
+    @client.set "interval/time/#{sendTo}/#{nodeId}", intervalTime, (error) =>
+      return callback error if error?
+      callback null, intervalTime
+
   createIntervalJob: (data, callback) =>
     {cronString, sendTo, nodeId, intervalTime} = data
-    if cronString? && !_.isEmpty cronString
-      try
-        intervalTime = @calculateNextCronInterval cronString
-        @client.set "interval/time/#{sendTo}/#{nodeId}", intervalTime
-      catch error
-        console.error 'createIntervalJob', error
-        @client.exists "interval/ping/#{sendTo}/#{nodeId}", (error, exists) =>
-          return callback() if error or exists == 1
-          @createPingJob data, callback
+    @updateCronIntervalTime {cronString, sendTo, nodeId}, (error, cronIntervalTime) =>
+      return callback error if error?
+      intervalTime = cronIntervalTime if cronIntervalTime?
+      data.intervalTime = intervalTime
+      if intervalTime < @minTimeDiff
+        console.error new Error "invalid intervalTime: #{intervalTime}"
+        console.error {data}
+        return callback()
 
-    data.intervalTime = intervalTime
-    if intervalTime < @minTimeDiff
-      console.error new Error "invalid intervalTime: #{intervalTime}"
-      console.error {data}
-      return callback()
-
-    job = @queue.create('interval', data)
-      .events(false)
-      .delay(intervalTime)
-      .removeOnComplete(true)
-      .attempts(@intervalAttempts)
-      .ttl(@intervalTTL)
-      .save (error) =>
-        return callback error if error?
-        async.series [
-          async.apply @client.del, "interval/job/#{sendTo}/#{nodeId}"
-          async.apply @client.sadd, "interval/job/#{sendTo}/#{nodeId}", job.id
-        ], callback
+      job = @queue.create('interval', data)
+        .events(false)
+        .delay(intervalTime)
+        .removeOnComplete(true)
+        .attempts(@intervalAttempts)
+        .ttl(@intervalTTL)
+        .save (error) =>
+          return callback error if error?
+          async.series [
+            async.apply @client.del, "interval/job/#{sendTo}/#{nodeId}"
+            async.apply @client.sadd, "interval/job/#{sendTo}/#{nodeId}", job.id
+          ], callback
 
   createIntervalProperties: (data, callback) =>
     {sendTo, nodeId, intervalTime, cronString, nonce} = data

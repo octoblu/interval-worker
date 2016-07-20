@@ -15,12 +15,12 @@ class PongJobProcessor
     @client.hincrby "ping:count:#{bucket}", 'total:pong', 1, (error) =>
       return callback error if error?
 
-    @client.hget "ping:count:total", flowNodeKey, (error, count) =>
-      return callback error if error?
-      count ?= 0
-      if count > 1
-        @client.del 'ping:count:total', callback
-      else
-        @client.hdel "ping:count:total", flowNodeKey, callback
+      @client.hget "ping:count:total", flowNodeKey, (error, count) =>
+        return callback error if error?
+        count ?= 0
+        if count > 1
+          @client.del 'ping:count:total', callback
+        else
+          @client.hdel "ping:count:total", flowNodeKey, callback
 
 module.exports = PongJobProcessor

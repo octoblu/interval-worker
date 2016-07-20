@@ -20,6 +20,7 @@ class RegisterJobProcessor
   createPingJob: (data, callback) =>
     {sendTo, nodeId} = data
     job = @queue.create('ping', data)
+      .ttl(5000)
       .events(false)
       .delay(@pingInterval)
       .removeOnComplete(true)

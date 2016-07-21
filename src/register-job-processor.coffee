@@ -2,20 +2,29 @@ _          = require 'lodash'
 async      = require 'async'
 debug      = require('debug')('nanocyte-interval-service:register-job-processor')
 cronParser = require 'cron-parser'
+Redlock    = require 'redlock'
 
 class RegisterJobProcessor
   constructor: (options) ->
     {@client,@kue,@queue,@pingInterval,@intervalAttempts,@intervalTTL,@minTimeDiff} = options
+    @redlock = new Redlock [@client], retryCount: 20, retryDelay: 100
 
   processJob: (job, ignore, callback) =>
     debug 'processing register job', job.id, 'data', JSON.stringify job.data
-    async.series [
-      async.apply @doUnregister, job.data
-      async.apply @removeDisabledKey, job.data
-      async.apply @createIntervalProperties, job.data
-      async.apply @createPingJob, job.data
-      async.apply @createIntervalJob, job.data
-    ], callback
+    {nodeId, sendTo} = job.data
+    key = "#{sendTo}/#{nodeId}"
+    @redlock.lock key, 5000, (error, lock) =>
+      return callback error if error?
+
+      async.series [
+        async.apply @doUnregister, job.data
+        async.apply @removeDisabledKey, job.data
+        async.apply @createIntervalProperties, job.data
+        async.apply @createPingJob, job.data
+        async.apply @createIntervalJob, job.data
+      ], (error) =>
+        lock.unlock()
+        callback error
 
   createPingJob: (data, callback) =>
     {sendTo, nodeId, fireOnce} = data

@@ -8,9 +8,10 @@ class PongJobProcessor
 
   processJob: (job, ignore, callback) =>
     debug 'processing pong job', job.id, 'data', JSON.stringify job.data
-    {bucket,sendTo,nodeId} = job.data
+    { bucket, sendTo, nodeId, transactionId } = job.data
     return callback new Error 'no data' unless bucket?
-    flowNodeKey = "#{sendTo}:#{nodeId}"
+    redisNodeId = transactionId ? nodeId
+    flowNodeKey = "#{sendTo}:#{redisNodeId}"
 
     @client.hincrby "ping:count:#{bucket}", 'total:pong', 1, (error) =>
       return callback error if error?

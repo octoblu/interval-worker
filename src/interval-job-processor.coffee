@@ -15,7 +15,9 @@ class IntervalJobProcessor
     @MeshbluHttp = dependencies.MeshbluHttp ? MeshbluHttp
 
   getJobs: (job, callback) =>
-    key = "interval/job/#{job.data.sendTo}/#{job.data.nodeId}"
+    { sendTo, nodeId, transactionId } = job.data
+    redisNodeId = transactionId ? nodeId
+    key = "interval/job/#{sendTo}/#{redisNodeId}"
 
     @client.srem key, job.id, (error) =>
       return callback error if error?
@@ -32,15 +34,16 @@ class IntervalJobProcessor
     async.each jobIds, @removeJob, callback
 
   getJobInfo: (job, callback) =>
-    {sendTo, nodeId} = job.data
+    {sendTo, nodeId, transactionId} = job.data
+    redisNodeId = transactionId ? nodeId
 
     keys = [
-      "interval/active/#{sendTo}/#{nodeId}",
-      "interval/time/#{sendTo}/#{nodeId}",
-      "interval/cron/#{sendTo}/#{nodeId}"
-      "interval/nonce/#{sendTo}/#{nodeId}"
-      "interval/uuid/#{sendTo}/#{nodeId}"
-      "interval/token/#{sendTo}/#{nodeId}"
+      "interval/active/#{sendTo}/#{redisNodeId}",
+      "interval/time/#{sendTo}/#{redisNodeId}",
+      "interval/cron/#{sendTo}/#{redisNodeId}"
+      "interval/nonce/#{sendTo}/#{redisNodeId}"
+      "interval/uuid/#{sendTo}/#{redisNodeId}"
+      "interval/token/#{sendTo}/#{redisNodeId}"
     ]
     @client.mget keys, (error, results) =>
       return callback error if error?
@@ -74,8 +77,9 @@ class IntervalJobProcessor
     @removeJobsIfNoUnsubscribe job, (error) =>
       return callback error if error?
 
-      {sendTo, nodeId, fireOnce} = job.data
-      @client.hexists 'ping:disabled', "#{sendTo}:#{nodeId}", (error, disabled) =>
+      {sendTo, nodeId, transactionId, fireOnce} = job.data
+      redisNodeId = transactionId ? nodeId
+      @client.hexists 'ping:disabled', "#{sendTo}:#{redisNodeId}", (error, disabled) =>
         return callback error if error?
 
         @getJobInfo job, (error, jobInfo) =>
@@ -92,6 +96,7 @@ class IntervalJobProcessor
               devices: [sendTo]
               payload:
                 from: nodeId
+                transactionId: transactionId
                 timestamp: _.now()
 
             meshbluHttp.message message

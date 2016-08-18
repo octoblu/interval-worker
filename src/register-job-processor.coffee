@@ -11,8 +11,9 @@ class RegisterJobProcessor
 
   processJob: (job, ignore, callback) =>
     debug 'processing register job', job.id, 'data', JSON.stringify job.data
-    {nodeId, sendTo} = job.data
-    key = "#{sendTo}/#{nodeId}"
+    {nodeId, sendTo, transactionId} = job.data
+    redisNodeId = transactionId ? nodeId
+    key = "#{sendTo}/#{redisNodeId}"
     @redlock.lock key, 5000, (error, lock) =>
       return callback error if error?
 
@@ -27,8 +28,9 @@ class RegisterJobProcessor
         callback error
 
   createPingJob: (data, callback) =>
-    {sendTo, nodeId, fireOnce} = data
+    {sendTo, nodeId, transactionId, fireOnce} = data
     return callback() if fireOnce
+    redisNodeId = transactionId ? nodeId
     job = @queue.create('ping', data)
       .ttl(5000)
       .events(false)
@@ -36,23 +38,25 @@ class RegisterJobProcessor
       .removeOnComplete(true)
       .save (error) =>
         return callback error if error?
-        @client.set "interval/ping/#{sendTo}/#{nodeId}", job.id, callback
+        @client.set "interval/ping/#{sendTo}/#{redisNodeId}", job.id, callback
 
-  updateCronIntervalTime: ({cronString, sendTo, nodeId}, callback) =>
+  updateCronIntervalTime: ({cronString, sendTo, nodeId, transactionId}, callback) =>
     return callback() if _.isEmpty cronString
+    redisNodeId = transactionId ? nodeId
     try
       intervalTime = @calculateNextCronInterval cronString
     catch error
       console.error 'calculateNextCronInterval', error
       return callback() if error?
 
-    @client.set "interval/time/#{sendTo}/#{nodeId}", intervalTime, (error) =>
+    @client.set "interval/time/#{sendTo}/#{redisNodeId}", intervalTime, (error) =>
       return callback error if error?
       callback null, intervalTime
 
   createIntervalJob: (data, callback) =>
-    {cronString, sendTo, nodeId, intervalTime} = data
-    @updateCronIntervalTime {cronString, sendTo, nodeId}, (error, cronIntervalTime) =>
+    {cronString, sendTo, nodeId, transactionId, intervalTime} = data
+    redisNodeId = transactionId ? nodeId
+    @updateCronIntervalTime {cronString, sendTo, nodeId, transactionId}, (error, cronIntervalTime) =>
       return callback error if error?
       intervalTime = cronIntervalTime if cronIntervalTime?
       data.intervalTime = intervalTime
@@ -70,17 +74,18 @@ class RegisterJobProcessor
         .save (error) =>
           return callback error if error?
           async.series [
-            async.apply @client.del, "interval/job/#{sendTo}/#{nodeId}"
-            async.apply @client.sadd, "interval/job/#{sendTo}/#{nodeId}", job.id
+            async.apply @client.del, "interval/job/#{sendTo}/#{redisNodeId}"
+            async.apply @client.sadd, "interval/job/#{sendTo}/#{redisNodeId}", job.id
           ], callback
 
   createIntervalProperties: (data, callback) =>
-    {sendTo, nodeId, intervalTime, cronString, nonce} = data
-    @client.mset "interval/active/#{sendTo}/#{nodeId}", 'true',
-      "interval/origTime/#{sendTo}/#{nodeId}", intervalTime || '',
-      "interval/time/#{sendTo}/#{nodeId}", intervalTime || '',
-      "interval/cron/#{sendTo}/#{nodeId}", cronString || '',
-      "interval/nonce/#{sendTo}/#{nodeId}", nonce || ''
+    {sendTo, nodeId, transactionId, intervalTime, cronString, nonce} = data
+    redisNodeId = transactionId ? nodeId
+    @client.mset "interval/active/#{sendTo}/#{redisNodeId}", 'true',
+      "interval/origTime/#{sendTo}/#{redisNodeId}", intervalTime || '',
+      "interval/time/#{sendTo}/#{redisNodeId}", intervalTime || '',
+      "interval/cron/#{sendTo}/#{redisNodeId}", cronString || '',
+      "interval/nonce/#{sendTo}/#{redisNodeId}", nonce || ''
     , callback
 
   calculateNextCronInterval: (cronString, currentDate) =>
@@ -95,29 +100,33 @@ class RegisterJobProcessor
 
     return timeDiff
 
-  removeDisabledKey: ({sendTo,nodeId}, callback) =>
-    @client.hdel 'ping:disabled', "#{sendTo}:#{nodeId}", callback
+  removeDisabledKey: ({sendTo, nodeId, transactionId}, callback) =>
+    redisNodeId = transactionId ? nodeId
+    @client.hdel 'ping:disabled', "#{sendTo}:#{redisNodeId}", callback
 
-  doUnregister: ({sendTo, nodeId}, callback) =>
+  doUnregister: ({sendTo, nodeId, transactionId}, callback) =>
     async.series [
-      async.apply @removeIntervalProperties, {sendTo, nodeId}
-      async.apply @removeIntervalJobs, {sendTo, nodeId}
-      async.apply @removePingJob, {sendTo, nodeId}
+      async.apply @removeIntervalProperties, {sendTo, nodeId, transactionId}
+      async.apply @removeIntervalJobs, {sendTo, nodeId, transactionId}
+      async.apply @removePingJob, {sendTo, nodeId, transactionId}
     ], callback
 
-  removeIntervalProperties: ({sendTo, nodeId}, callback) =>
-      @client.del "interval/active/#{sendTo}/#{nodeId}",
-      "interval/time/#{sendTo}/#{nodeId}",
-      "interval/cron/#{sendTo}/#{nodeId}",
-      "interval/nonce/#{sendTo}/#{nodeId}", callback
+  removeIntervalProperties: ({sendTo, nodeId, transactionId}, callback) =>
+    redisNodeId = transactionId ? nodeId
+    @client.del "interval/active/#{sendTo}/#{redisNodeId}",
+    "interval/time/#{sendTo}/#{redisNodeId}",
+    "interval/cron/#{sendTo}/#{redisNodeId}",
+    "interval/nonce/#{sendTo}/#{redisNodeId}", callback
 
-  removeIntervalJobs: ({sendTo, nodeId}, callback) =>
-    @client.smembers "interval/job/#{sendTo}/#{nodeId}", (error, jobIds) =>
+  removeIntervalJobs: ({sendTo, nodeId, transactionId}, callback) =>
+    redisNodeId = transactionId ? nodeId
+    @client.smembers "interval/job/#{sendTo}/#{redisNodeId}", (error, jobIds) =>
       return callback error if error?
       async.each jobIds, @removeJob, callback
 
-  removePingJob: ({sendTo, nodeId}, callback) =>
-    @client.get "interval/ping/#{sendTo}/#{nodeId}", (error, jobId) =>
+  removePingJob: ({sendTo, nodeId, transactionId}, callback) =>
+    redisNodeId = transactionId ? nodeId
+    @client.get "interval/ping/#{sendTo}/#{redisNodeId}", (error, jobId) =>
       return callback error if error?
       @removeJob jobId, callback
 

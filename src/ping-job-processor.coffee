@@ -18,12 +18,14 @@ class PingJobProcessor
 
   processJob: (job, ignore, callback) =>
     debug 'processing ping job', job.id, 'data', JSON.stringify job.data
-    {sendTo, nodeId} = job.data
+    {sendTo, nodeId, transactionId} = job.data
 
-    flowNodeKey = "#{sendTo}:#{nodeId}"
+    redisNodeId = transactionId ? nodeId
+
+    flowNodeKey = "#{sendTo}:#{redisNodeId}"
     bucket = @_getBucket()
 
-    @isIntervalAvailable {sendTo, nodeId}, (error, intervalAvailable) =>
+    @isIntervalAvailable {sendTo, nodeId, transactionId}, (error, intervalAvailable) =>
       return callback error if error?
       return callback() unless intervalAvailable
 
@@ -41,11 +43,11 @@ class PingJobProcessor
 
             count ?= 0
             if systemStable && parseInt(count || 0) >= 5
-              return @_disableJobs({pingJobId: job.id, sendTo, nodeId}, callback)
+              return @_disableJobs({pingJobId: job.id, sendTo, nodeId, transactionId}, callback)
 
             keys = [
-              "interval/uuid/#{sendTo}/#{nodeId}"
-              "interval/token/#{sendTo}/#{nodeId}"
+              "interval/uuid/#{sendTo}/#{redisNodeId}"
+              "interval/token/#{sendTo}/#{redisNodeId}"
             ]
             @client.mget keys, (error, result) =>
               return callback error if error?
@@ -61,6 +63,7 @@ class PingJobProcessor
                   payload:
                     from: nodeId
                     nodeId: nodeId
+                    transactionId: transactionId
                     bucket: @_getBucket()
                     timestamp: _.now()
 
@@ -75,15 +78,17 @@ class PingJobProcessor
 
               async.series tasks, callback
 
-  _disableJobs: ({pingJobId, sendTo, nodeId}, callback) =>
-    @client.smembers "interval/job/#{sendTo}/#{nodeId}", (err, jobIds) =>
+  _disableJobs: ({pingJobId, sendTo, nodeId, transactionId}, callback) =>
+    redisNodeId = transactionId ? nodeId
+    @client.smembers "interval/job/#{sendTo}/#{redisNodeId}", (err, jobIds) =>
       jobIds ?= []
-      async.eachSeries jobIds, async.apply(@_disableJob, {sendTo, nodeId}), (error) =>
+      async.eachSeries jobIds, async.apply(@_disableJob, {sendTo, nodeId, transactionId}), (error) =>
         return callback error if error?
         @_removeJob pingJobId, callback
 
-  _disableJob: ({sendTo, nodeId}, jobId, callback) =>
-    @client.hset 'ping:disabled', "#{sendTo}:#{nodeId}", Date.now(), callback
+  _disableJob: ({sendTo, nodeId, transactionId}, jobId, callback) =>
+    redisNodeId = transactionId ? nodeId
+    @client.hset 'ping:disabled', "#{sendTo}:#{redisNodeId}", Date.now(), callback
 
   _removeJob: (jobId, callback) =>
     return callback() unless jobId?
@@ -129,11 +134,12 @@ class PingJobProcessor
     return callback() if stable
     @client.del 'ping:count:total', callback
 
-  isIntervalAvailable: ({sendTo,nodeId}, callback) =>
-    @client.hexists 'ping:disabled', "#{sendTo}:#{nodeId}", (error, exists) =>
+  isIntervalAvailable: ({sendTo,nodeId,transactionId}, callback) =>
+    redisNodeId = transactionId ? nodeId
+    @client.hexists 'ping:disabled', "#{sendTo}:#{redisNodeId}", (error, exists) =>
       return callback error if error?
       return callback null, false if exists == 1
-      @client.exists "interval/active/#{sendTo}/#{nodeId}", (error, exists) =>
+      @client.exists "interval/active/#{sendTo}/#{redisNodeId}", (error, exists) =>
         return callback error if error?
         callback null, exists == 1
 

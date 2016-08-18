@@ -8,10 +8,11 @@ class UnregisterJobProcessor
 
   processJob: (job, ignore, callback) =>
     debug 'processing unregister job', job.id, 'data', JSON.stringify job.data
-    {sendTo, nodeId, nonce} = job.data
-    @client.get "interval/nonce/#{sendTo}/#{nodeId}", (error, savedNonce) =>
+    {sendTo, nodeId, transactionId, nonce} = job.data
+    redisNodeId = transactionId ? nodeId
+    @client.get "interval/nonce/#{sendTo}/#{redisNodeId}", (error, savedNonce) =>
       return callback error if error?
       return callback new Error 'nonce does not match' unless savedNonce == nonce
-      @registerJobProcessor.doUnregister {sendTo, nodeId}, callback
+      @registerJobProcessor.doUnregister {sendTo, nodeId, transactionId}, callback
 
 module.exports = UnregisterJobProcessor

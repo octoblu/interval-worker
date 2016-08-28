@@ -101,7 +101,7 @@ class IntervalJobProcessor
 
             meshbluHttp.message message
 
-          return callback() if fireOnce
+          return @registerJobProcessor.doUnregister {sendTo, nodeId, transactionId}, callback if fireOnce
 
           data = _.clone job.data
           data.intervalTime = intervalTime

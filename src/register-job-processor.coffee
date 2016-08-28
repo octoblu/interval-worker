@@ -115,6 +115,8 @@ class RegisterJobProcessor
     redisNodeId = transactionId ? nodeId
     @client.del "interval/active/#{sendTo}/#{redisNodeId}",
     "interval/time/#{sendTo}/#{redisNodeId}",
+    "interval/origTime/#{sendTo}/#{redisNodeId}",
+    "interval/job/#{sendTo}/#{redisNodeId}",
     "interval/cron/#{sendTo}/#{redisNodeId}",
     "interval/nonce/#{sendTo}/#{redisNodeId}", callback
 

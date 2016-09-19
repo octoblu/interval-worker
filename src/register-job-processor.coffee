@@ -26,6 +26,7 @@ class RegisterJobProcessor
       ], (error) =>
         lock.unlock()
         callback error
+    return null # avoid returning redlock
 
   createPingJob: (data, callback) =>
     {sendTo, nodeId, transactionId, fireOnce} = data

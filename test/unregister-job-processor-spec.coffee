@@ -66,17 +66,13 @@ describe 'UnregisterJobProcessor', ->
         @sut.processJob @unregisterJob, {}, done
 
       it 'should delete the pingJob', (done) ->
-        @client.get 'interval/ping/unregister-flow-id/some-node-id', (error, jobId) =>
-          return done error if error?
-          @kue.Job.get jobId, (error, job) =>
+          @kue.Job.get @pingJob.id, (error, job) =>
             expect(error).to.exist
             expect(job).not.to.exist
             done()
 
       it 'should delete the intervalJob', (done) ->
-        @client.smembers 'interval/job/unregister-flow-id/some-node-id', (error, jobIds) =>
-          return done error if error?
-          @kue.Job.get _.first(jobIds), (error, job) =>
+          @kue.Job.get @intervalJob.id, (error, job) =>
             expect(error).to.exist
             expect(job).not.to.exist
             done()

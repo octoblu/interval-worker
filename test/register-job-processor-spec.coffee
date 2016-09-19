@@ -169,6 +169,12 @@ describe 'RegisterJobProcessor', ->
           expect(job).not.to.exist
           done()
 
+      it 'should delete the intervalJob', (done) ->
+        @kue.Job.get @intervalJob.id, (error, job) =>
+          expect(error).to.exist
+          expect(job).not.to.exist
+          done()
+
     context 'with cronString', ->
       beforeEach (done) ->
         @registerJob = @queue.create 'register', {

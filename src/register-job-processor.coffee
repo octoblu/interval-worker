@@ -106,11 +106,13 @@ class RegisterJobProcessor
     @client.hdel 'ping:disabled', "#{sendTo}:#{redisNodeId}", callback
 
   doUnregister: ({sendTo, nodeId, transactionId}, callback) =>
+    # order is important here
     async.series [
-      async.apply @removeIntervalProperties, {sendTo, nodeId, transactionId}
       async.apply @removeIntervalJobs, {sendTo, nodeId, transactionId}
       async.apply @removePingJob, {sendTo, nodeId, transactionId}
+      async.apply @removeIntervalProperties, {sendTo, nodeId, transactionId}
     ], callback
+    return # mocha promises
 
   removeIntervalProperties: ({sendTo, nodeId, transactionId}, callback) =>
     redisNodeId = transactionId ? nodeId

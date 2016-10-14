@@ -1,6 +1,6 @@
 {
   "name": "interval-worker",
-  "version": "2.9.3",
+  "version": "2.9.4",
   "description": "Simple interval service for nanocytes",
   "main": "command.js",
   "scripts": {

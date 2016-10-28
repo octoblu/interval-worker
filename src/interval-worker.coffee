@@ -18,6 +18,7 @@ class IntervalWorker
       @minTimeDiff
       @redisUri
       @pingInterval
+      @disableWatchStuckJobs
     } = @options
     debug 'start KueWorker constructor'
     @kue = dependencies.kue ? require 'kue'
@@ -48,7 +49,7 @@ class IntervalWorker
         promotion:
           interval: @intervalPromotion
 
-      @queue.watchStuckJobs()
+      @queue.watchStuckJobs() if @disableWatchStuckJobs
       debug 'kueWorker queue start'
 
       options = {

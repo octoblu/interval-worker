@@ -1,6 +1,6 @@
 {
   "name": "interval-worker",
-  "version": "2.9.4",
+  "version": "2.9.5",
   "description": "Simple interval service for nanocytes",
   "main": "command.js",
   "scripts": {
@@ -31,10 +31,10 @@
     "debug": "^2.2.0",
     "fast-stats": "0.0.3",
     "ioredis": "^2.2.0",
-    "kue": "^0.11.1",
+    "kue": "^0.11.4",
     "lodash": "^4.13.1",
     "meshblu-config": "^6.0.0",
-    "meshblu-http": "^7.0.0",
+    "meshblu-http": "^9.1.0",
     "redlock": "^2.0.0",
     "uuid": "^2.0.2"
   },

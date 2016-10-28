@@ -49,7 +49,7 @@ class IntervalWorker
         promotion:
           interval: @intervalPromotion
 
-      @queue.watchStuckJobs() if @disableWatchStuckJobs
+      @queue.watchStuckJobs() unless @disableWatchStuckJobs
       debug 'kueWorker queue start'
 
       options = {
